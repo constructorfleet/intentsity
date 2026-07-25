@@ -62,4 +62,13 @@
   --waveform-track:var(--gray-700);
   --waveform-playhead:var(--gray-50);
   --shadow-focus:0 0 0 3px rgba(29,191,174,.35);
+
+  /* The label tints are authored for light surfaces: a near-white -050 fill
+     with -600 ink. Both invert on dark, otherwise quiet chips and the user
+     conversation bubble render as white on white. */
+  --tp-050:rgba(16,185,129,.16);  --tp-600:#6ee7b7;
+  --tn-050:rgba(59,130,246,.18);  --tn-600:#93c5fd;
+  --fp-050:rgba(239,68,68,.16);   --fp-600:#fca5a5;
+  --fn-050:rgba(245,158,11,.16);  --fn-600:#fcd34d;
+  --bg-050:rgba(139,92,246,.16);  --bg-600:#c4b5fd;
 }

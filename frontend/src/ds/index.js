@@ -23,5 +23,10 @@ export { Radio, RadioGroup } from "./components/forms/Radio.jsx";
 export { Select } from "./components/forms/Select.jsx";
 export { Switch } from "./components/forms/Switch.jsx";
 export { Textarea } from "./components/forms/Textarea.jsx";
-export { Sidebar, SidebarItem, SidebarSection } from "./components/nav/Sidebar.jsx";
+export {
+  Sidebar,
+  SidebarItem,
+  SidebarSection,
+  useSidebarCollapsed,
+} from "./components/nav/Sidebar.jsx";
 export { Toolbar, ToolbarSeparator, ToolbarSpacer } from "./components/nav/Toolbar.jsx";

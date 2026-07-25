@@ -16,6 +16,32 @@ const WORKSPACES = [
 ];
 
 const THEME_STORAGE_KEY = "intentsity.theme";
+const RAIL_STORAGE_KEY = "intentsity.sidebarCollapsed";
+
+/** Two workspaces do not need 232px of chrome, so the rail is collapsible. */
+function useCollapsedRail() {
+  const [collapsed, setCollapsed] = React.useState(() => {
+    try {
+      return window.localStorage.getItem(RAIL_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggle = React.useCallback(() => {
+    setCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(RAIL_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        // Private browsing: an unsaved preference is not worth failing over.
+      }
+      return next;
+    });
+  }, []);
+
+  return [collapsed, toggle];
+}
 
 /** Follow Home Assistant's dark mode unless the reviewer has picked a theme. */
 function useTheme(hass) {
@@ -60,6 +86,7 @@ const entityCount = (hass, slug) => {
 export function App({ hass, narrow }) {
   const [workspaceId, setWorkspaceId] = React.useState(WORKSPACES[0].id);
   const [theme, toggleTheme] = useTheme(hass);
+  const [railCollapsed, toggleRail] = useCollapsedRail();
   const { toasts, push, dismiss } = useToasts();
 
   // The API wrapper reads hass lazily, so it only needs rebuilding when the
@@ -100,12 +127,13 @@ export function App({ hass, narrow }) {
       }}
     >
       {!narrow && (
-        <Sidebar>
+        <Sidebar width={196} collapsed={railCollapsed}>
           <div
             style={{
-              padding: "14px 12px",
+              padding: railCollapsed ? "12px 6px" : "14px 8px 14px 12px",
               display: "flex",
               alignItems: "center",
+              justifyContent: railCollapsed ? "center" : "flex-start",
               gap: 8,
               borderBottom: "1px solid var(--border-subtle)",
             }}
@@ -113,11 +141,30 @@ export function App({ hass, narrow }) {
             <BrandMark />
             {/* The wordmark is live text, not `logo.svg`: the design system sets
                 it in dark ink, which vanishes on the dark theme. */}
-            <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: -0.02 }}>
-              Intent<span style={{ color: "var(--brand-500)" }}>s</span>ity
-            </span>
+            {!railCollapsed && (
+              <>
+                <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: -0.02 }}>
+                  Intent<span style={{ color: "var(--brand-500)" }}>s</span>ity
+                </span>
+                <div style={{ flex: 1 }} />
+                <Tooltip content="Collapse sidebar">
+                  <IconButton size="sm" aria-label="Collapse sidebar" onClick={toggleRail}>
+                    <Icon d={ICONS.chevronLeft} size={12} />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
           </div>
-          <SidebarSection title="Workspaces">
+          {railCollapsed && (
+            <div style={{ display: "flex", justifyContent: "center", padding: "8px 0 0" }}>
+              <Tooltip content="Expand sidebar" placement="right">
+                <IconButton size="sm" aria-label="Expand sidebar" onClick={toggleRail}>
+                  <Icon d={ICONS.chevronRight} size={12} />
+                </IconButton>
+              </Tooltip>
+            </div>
+          )}
+          <SidebarSection title={railCollapsed ? undefined : "Workspaces"}>
             {WORKSPACES.map((entry) => (
               <SidebarItem
                 key={entry.id}
@@ -133,22 +180,37 @@ export function App({ hass, narrow }) {
           <div
             style={{
               marginTop: "auto",
-              padding: "10px 12px",
+              padding: railCollapsed ? "10px 0" : "10px 12px",
               borderTop: "1px solid var(--border-subtle)",
               display: "flex",
               alignItems: "center",
+              justifyContent: railCollapsed ? "center" : "flex-start",
               gap: 8,
               fontSize: 12,
               color: "var(--text-muted)",
             }}
           >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: "var(--text-body)", fontSize: 12, fontWeight: 500 }}>
-                {hass?.user?.name ?? "Home Assistant"}
+            {!railCollapsed && (
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    color: "var(--text-body)",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {hass?.user?.name ?? "Home Assistant"}
+                </div>
+                <div style={{ fontSize: 11, fontFamily: "var(--font-mono)" }}>v{VERSION}</div>
               </div>
-              <div style={{ fontSize: 11, fontFamily: "var(--font-mono)" }}>v{VERSION}</div>
-            </div>
-            <Tooltip content={theme === "dark" ? "Switch to light" : "Switch to dark"}>
+            )}
+            <Tooltip
+              content={theme === "dark" ? "Switch to light" : "Switch to dark"}
+              placement={railCollapsed ? "right" : "top"}
+            >
               <IconButton size="sm" aria-label="Toggle theme" onClick={toggleTheme}>
                 <Icon d={ICONS.theme} size={12} />
               </IconButton>
