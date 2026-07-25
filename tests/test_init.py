@@ -6,6 +6,7 @@ import sqlite3
 from typing import Any
 from unittest.mock import patch
 
+from homeassistant.components.conversation.chat_log import DATA_SUBSCRIPTIONS
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -29,6 +30,7 @@ from custom_components.intentsity.const import (
     CONF_UDP_ENABLED,
     COORDINATOR_KEY,
     DATA_API_REGISTERED,
+    DATA_CHAT_LOG_UNSUBSCRIBE,
     DATA_DB_INITIALIZED,
     DATA_UNSUBSCRIBE,
     DATA_WEBHOOK_ID,
@@ -71,6 +73,7 @@ async def test_setup_entry_wires_everything_up(
     assert domain_data[DATA_API_REGISTERED] is True
     assert isinstance(domain_data[AUDIO_KEY], CaptureManager)
     assert COORDINATOR_KEY in domain_data
+    assert DATA_CHAT_LOG_UNSUBSCRIBE in domain_data
     assert db.get_db_path(hass).is_file()
 
     # The panel is registered, and the websocket commands with it.
@@ -102,6 +105,7 @@ async def test_unload_entry_tears_everything_down(
     assert setup_entry.state is ConfigEntryState.NOT_LOADED
     assert DOMAIN not in hass.data
     assert manager.udp_running is False
+    assert hass.data[DATA_SUBSCRIPTIONS] == []
 
     from homeassistant.components import webhook
 
@@ -265,6 +269,24 @@ async def test_initialize_reuses_the_database_and_coordinator(
 
     init_db.assert_not_called()
     assert hass.data[DOMAIN][COORDINATOR_KEY] is coordinator
+
+
+async def test_chat_log_event_requests_a_coordinator_refresh(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    coordinator = hass.data[DOMAIN][COORDINATOR_KEY]
+    refreshes: list[bool] = []
+
+    async def _refresh() -> None:
+        refreshes.append(True)
+
+    monkeypatch.setattr(coordinator, "async_request_refresh", _refresh)
+
+    [callback] = hass.data[DATA_SUBSCRIPTIONS]
+    callback("conv-1", object(), {})
+    await hass.async_block_till_done()
+
+    assert refreshes == [True]
 
 
 # --- Legacy clip import ---------------------------------------------------
