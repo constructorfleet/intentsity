@@ -359,18 +359,24 @@ async def test_async_update_data_persists_a_chat(
     hass.data[KEY_ASSIST_PIPELINE] = _PipelineData({pipeline_env.id: {"run-1": run_debug}})
 
     persisted: dict[str, Any] = {}
+    signals: list[str] = []
 
     def _upsert_chat(_hass, chat):
         persisted["chat"] = chat
         return chat.conversation_id, chat.pipeline_run_id
 
     monkeypatch.setattr(db, "upsert_chat", _upsert_chat)
+    monkeypatch.setattr(
+        "custom_components.intentsity.coordinator.async_dispatcher_send",
+        lambda _hass, signal: signals.append(signal),
+    )
 
     data = await IntentsityCoordinator(hass)._async_update_data()
 
     assert persisted["chat"].conversation_id == "conv-4"
     assert persisted["chat"].pipeline_run_id == "run-1"
     assert persisted["chat"].run_timestamp == parse_timestamp(run_debug.timestamp)
+    assert signals == ["intentsity_event_recorded"]
     assert data == {"pipelines": {}, "uncorrected_count": 2, "unlabeled_clips": 5}
 
 

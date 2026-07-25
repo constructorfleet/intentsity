@@ -19,10 +19,11 @@ from homeassistant.components.conversation.chat_log import (
     SystemContent,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from . import db
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_EVENT_RECORDED
 from .models import Chat, ChatMessage
 from .utils import parse_timestamp
 
@@ -237,6 +238,7 @@ class IntentsityCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self.hass,
                     chat,
                 )
+                async_dispatcher_send(self.hass, SIGNAL_EVENT_RECORDED)
 
         uncorrected_count = await self.hass.async_add_executor_job(
             db.count_uncorrected_chats, self.hass
