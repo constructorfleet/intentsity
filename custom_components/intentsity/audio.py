@@ -52,7 +52,7 @@ def compute_peaks(samples: np.ndarray, points: int = WAVEFORM_POINTS) -> list[fl
     ceiling = float(peaks.max())
     if ceiling <= 0:
         return [0.0] * len(peaks)
-    return [round(value / ceiling, 4) for value in peaks]
+    return [float(round(value / ceiling, 4)) for value in peaks]
 
 
 @dataclass
