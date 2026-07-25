@@ -1,6 +1,6 @@
 {
   "name": "intentsity-panel",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Home Assistant sidebar panel for Intentsity: wake-word annotation and Assist intent training",
   "license": "MIT",
