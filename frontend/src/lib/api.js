@@ -12,6 +12,7 @@ export const CMD = {
   subscribeClips: "intentsity/clips/subscribe",
   labelClips: "intentsity/clips/label",
   tombstoneClips: "intentsity/clips/tombstone",
+  repairClipRate: "intentsity/clips/repair_rate",
   captureNoise: "intentsity/clips/capture_noise",
   assistants: "intentsity/assistants",
 };
@@ -57,6 +58,10 @@ export class IntentsityApi {
 
   tombstoneClips(clipIds, restore = false) {
     return this.call(CMD.tombstoneClips, { clip_ids: clipIds, restore });
+  }
+
+  repairClipRate(clipId) {
+    return this.call(CMD.repairClipRate, { clip_id: clipId });
   }
 
   captureNoise(assistantId, seconds) {

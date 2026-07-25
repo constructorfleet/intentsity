@@ -44,6 +44,7 @@ WS_CMD_LIST_CLIPS: Final = "intentsity/clips/list"
 WS_CMD_SUBSCRIBE_CLIPS: Final = "intentsity/clips/subscribe"
 WS_CMD_LABEL_CLIP: Final = "intentsity/clips/label"
 WS_CMD_TOMBSTONE_CLIPS: Final = "intentsity/clips/tombstone"
+WS_CMD_REPAIR_CLIP_RATE: Final = "intentsity/clips/repair_rate"
 WS_CMD_CAPTURE_NOISE: Final = "intentsity/clips/capture_noise"
 WS_CMD_ASSISTANTS: Final = "intentsity/assistants"
 

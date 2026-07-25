@@ -102,6 +102,7 @@ export function Annotator({ api, onError, onNotify }) {
   const [busy, setBusy] = React.useState(false);
 
   const [audioUrl, setAudioUrl] = React.useState(null);
+  const [audioVersion, setAudioVersion] = React.useState(0);
   const [playing, setPlaying] = React.useState(false);
   const [playhead, setPlayhead] = React.useState(0);
   const audioRef = React.useRef(null);
@@ -180,7 +181,7 @@ export function Annotator({ api, onError, onNotify }) {
     let cancelled = false;
     setAudioUrl(null);
     api
-      .signPath(clipAudioPath)
+      .signPath(`${clipAudioPath}?v=${audioVersion}`)
       .then((signed) => {
         if (!cancelled) setAudioUrl(signed);
       })
@@ -190,7 +191,7 @@ export function Annotator({ api, onError, onNotify }) {
     return () => {
       cancelled = true;
     };
-  }, [api, clipAudioPath, onError]);
+  }, [api, audioVersion, clipAudioPath, onError]);
 
   React.useEffect(() => {
     setPlayhead(0);
@@ -239,6 +240,25 @@ export function Annotator({ api, onError, onNotify }) {
     try {
       await api.tombstoneClips([clip.id], restore);
       onNotify("info", restore ? "Clip restored" : "Clip deleted", clip.filename);
+    } catch (error) {
+      onError(error);
+    } finally {
+      setBusy(false);
+    }
+  }, [api, clip, onError, onNotify]);
+
+  const repairClipRate = React.useCallback(async () => {
+    if (!clip) return;
+    setBusy(true);
+    setPlaying(false);
+    try {
+      const result = await api.repairClipRate(clip.id);
+      if (result.repaired > 0) {
+        setAudioVersion((value) => value + 1);
+        onNotify("success", "Repaired WAV header", clip.filename);
+      } else {
+        onNotify("warn", "Clip was not changed", clip.filename);
+      }
     } catch (error) {
       onError(error);
     } finally {
@@ -533,6 +553,19 @@ export function Annotator({ api, onError, onNotify }) {
                       {clip.assistant_id ?? "unknown"} · {formatDateTime(clip.timestamp)}
                     </div>
                   </div>
+                  {clip.sample_rate === 48000 && (
+                    <Tooltip content="Rewrite legacy 48 kHz metadata to 16 kHz without resampling">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={repairClipRate}
+                        iconLeft={<Icon d={ICONS.refresh} size={12} />}
+                      >
+                        Repair 48k to 16k
+                      </Button>
+                    </Tooltip>
+                  )}
                   <Tooltip content={clip.deleted_at ? "Restore clip" : "Delete clip"}>
                     <IconButton
                       aria-label={clip.deleted_at ? "Restore clip" : "Delete clip"}

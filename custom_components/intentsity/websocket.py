@@ -24,6 +24,7 @@ from .const import (
     WS_CMD_LABEL_CLIP,
     WS_CMD_LIST_CHATS,
     WS_CMD_LIST_CLIPS,
+    WS_CMD_REPAIR_CLIP_RATE,
     WS_CMD_SAVE_CORRECTED_CHAT,
     WS_CMD_SUBSCRIBE_CHATS,
     WS_CMD_SUBSCRIBE_CLIPS,
@@ -35,12 +36,14 @@ from .db import (
     fetch_chats,
     fetch_chats_page,
     fetch_clips_page,
+    get_storage_dir,
     label_clips,
     tombstone_clips,
     tombstone_targets,
     upsert_corrected_chat,
 )
 from .export import generate_corrected_jsonl
+from .maintenance import repair_misdeclared_clip_sample_rates
 from .models import (
     AssistantListResponse,
     AssistantStatus,
@@ -49,6 +52,7 @@ from .models import (
     ChatListResponse,
     ClipLabelRequest,
     ClipListRequest,
+    ClipRateRepairRequest,
     ClipTombstoneRequest,
     CorrectedChatExportRequest,
     CorrectedChatSaveRequest,
@@ -78,6 +82,7 @@ def async_register_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_subscribe_clips)
     websocket_api.async_register_command(hass, websocket_label_clips)
     websocket_api.async_register_command(hass, websocket_tombstone_clips)
+    websocket_api.async_register_command(hass, websocket_repair_clip_rate)
     websocket_api.async_register_command(hass, websocket_capture_noise)
     websocket_api.async_register_command(hass, websocket_assistants)
 
@@ -406,6 +411,44 @@ def websocket_tombstone_clips(
         connection.send_result(msg["id"], {"updated": updated})
 
     hass.async_create_task(_tombstone())
+
+
+@websocket_api.decorators.websocket_command(
+    {
+        vol.Required("type"): WS_CMD_REPAIR_CLIP_RATE,
+        vol.Required("clip_id"): vol.Coerce(int),
+    }
+)
+@callback
+def websocket_repair_clip_rate(
+    hass: HomeAssistant,
+    connection: websocket_api.connection.ActiveConnection,
+    msg: dict,
+) -> None:
+    """Repair one legacy clip whose 16 kHz PCM was declared as 48 kHz."""
+    request = ClipRateRepairRequest.model_validate(msg)
+
+    def _repair() -> dict:
+        summary = repair_misdeclared_clip_sample_rates(
+            get_storage_dir(hass),
+            clip_id=request.clip_id,
+            dry_run=False,
+        )
+        return {
+            "scanned": summary.scanned,
+            "repaired": summary.repaired,
+            "missing_file": summary.missing_file,
+            "skipped_header_rate": summary.skipped_header_rate,
+            "skipped_unsupported_format": summary.skipped_unsupported_format,
+        }
+
+    async def _run() -> None:
+        payload = await hass.async_add_executor_job(_repair)
+        if payload["repaired"]:
+            async_dispatcher_send(hass, SIGNAL_CLIP_RECORDED)
+        connection.send_result(msg["id"], payload)
+
+    hass.async_create_task(_run())
 
 
 @websocket_api.decorators.websocket_command(
