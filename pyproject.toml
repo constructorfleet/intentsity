@@ -1,6 +1,6 @@
 [project]
 name = "intentsity"
-version = "1.0.5"
+version = "1.0.6"
 description = "Home Assistant integration for wake-word annotation and Assist intent training"
 readme = "README.md"
 # Upper bound because homeassistant is pinned exactly below; without it uv also
