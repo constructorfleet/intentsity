@@ -9,10 +9,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const source = resolve(here, "../DesignSystem");
 const target = resolve(here, "src/ds");
 
-await rm(join(target, "components"), { recursive: true, force: true });
-await rm(join(target, "tokens"), { recursive: true, force: true });
-await mkdir(join(target, "components"), { recursive: true });
-await mkdir(join(target, "tokens"), { recursive: true });
+for (const dir of ["components", "tokens", "assets"]) {
+  await rm(join(target, dir), { recursive: true, force: true });
+  await mkdir(join(target, dir), { recursive: true });
+}
 
 await cp(join(source, "components"), join(target, "components"), {
   recursive: true,
@@ -23,6 +23,15 @@ await cp(join(source, "components"), join(target, "components"), {
 for (const file of await readdir(join(source, "tokens"))) {
   if (file.endsWith(".css")) {
     await cp(join(source, "tokens", file), join(target, "tokens", file));
+  }
+}
+
+// The brand marks. Only the SVGs are bundled — the PNGs under
+// custom_components/intentsity/brand/ are rasterized from these separately, for
+// Home Assistant's brands repository and the config-entry logo.
+for (const file of await readdir(join(source, "assets"))) {
+  if (file.endsWith(".svg")) {
+    await cp(join(source, "assets", file), join(target, "assets", file));
   }
 }
 

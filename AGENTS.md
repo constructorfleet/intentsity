@@ -54,7 +54,8 @@ Violating any of these is a defect, not a tradeoff.
 | `custom_components/intentsity/panel.js` | **Build artifact.** Never edit by hand |
 | `frontend/src/` | React panel sources |
 | `frontend/src/ds/` | **Vendor copy** of `DesignSystem/`. Regenerate, never edit |
-| `DesignSystem/` | Source of truth for all components and tokens |
+| `DesignSystem/` | Source of truth for all components, tokens, and brand marks |
+| `brand/` | PNGs rasterized from `DesignSystem/assets/`, for the HA brands repo only |
 | `esphome/` | Example device configs, one per transport |
 | `tests/` | Pytest suite. Behavior without a test is broken by default |
 | `.github/workflows/` | `validate.yaml` (HACS, hassfest, python, frontend) and `release.yaml` |
@@ -164,6 +165,13 @@ npm run check     # resolve and typecheck without writing panel.js
 To change a component's appearance, edit it in `DesignSystem/` and re-sync. Editing
 `frontend/src/ds/` directly means the next sync silently reverts your work. Commit the rebuilt
 `panel.js` with the source change — HACS ships the artifact, not a build.
+
+The brand marks live in `DesignSystem/assets/`. `sync-ds` vendors the SVGs and the panel inlines
+`icon.svg` (see `components/Brand.jsx`), so no image is fetched at runtime. `logo.svg` is *not*
+used in the panel: its wordmark is dark ink on transparent and disappears on the dark theme, so
+the sidebar pairs the icon with the wordmark as live text. If a light-ink lockup is ever
+supplied, that workaround can go. `brand/*.png` are for the Home Assistant brands repository;
+regeneration steps are in `brand/README.md`.
 
 The panel must render correctly on desktop and mobile, and must follow Home Assistant's dark
 mode unless the reviewer has explicitly picked a theme.

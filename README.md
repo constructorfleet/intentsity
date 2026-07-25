@@ -200,9 +200,11 @@ npm run build        # emits custom_components/intentsity/panel.js
 npm run dev          # same, watching
 ```
 
-`DesignSystem/` is the source of truth for every component and token; `frontend/src/ds/` is a
-build-time vendor copy so the bundle has no runtime dependency on that tree. Edit the design
-system, then re-run `npm run sync-ds`.
+`DesignSystem/` is the source of truth for every component, token, and brand mark;
+`frontend/src/ds/` is a build-time vendor copy so the bundle has no runtime dependency on that
+tree. Edit the design system, then re-run `npm run sync-ds`. The PNGs in [brand/](brand/) are
+rasterized from `DesignSystem/assets/` for the Home Assistant brands repository and are not
+part of the shipped integration.
 
 Contributor conventions, invariants, and the release checklist live in [AGENTS.md](AGENTS.md).
 

@@ -21,7 +21,7 @@ const options = {
   target: ["es2022"],
   platform: "browser",
   jsx: "automatic",
-  loader: { ".css": "text", ".jsx": "jsx" },
+  loader: { ".css": "text", ".jsx": "jsx", ".svg": "text" },
   minify: !dev,
   sourcemap: dev ? "inline" : false,
   legalComments: "none",

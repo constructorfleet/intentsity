@@ -169,10 +169,7 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     module_dir = Path(__file__).parent
     version = randint(0, 999999)
     await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig("/intentsity_panel.js", str(module_dir / "panel.js"), False),
-            StaticPathConfig("/intentsity_logo.png", str(module_dir / "brand" / "logo.png"), False),
-        ]
+        [StaticPathConfig("/intentsity_panel.js", str(module_dir / "panel.js"), False)]
     )
     async_register_built_in_panel(
         hass,

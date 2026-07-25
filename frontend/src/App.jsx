@@ -1,5 +1,6 @@
 import React from "react";
 
+import { BrandMark } from "./components/Brand.jsx";
 import { Icon, ICONS } from "./components/Icon.jsx";
 import { IconButton, Sidebar, SidebarItem, SidebarSection, Toast, Tooltip } from "./ds/index.js";
 import { IntentsityApi } from "./lib/api.js";
@@ -43,16 +44,6 @@ function useTheme(hass) {
 
   return [theme, toggle];
 }
-
-const LOGO = (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-    <rect x="2" y="10" width="2" height="4" fill="var(--brand-500)" />
-    <rect x="6" y="6" width="2" height="12" fill="var(--brand-500)" />
-    <rect x="10" y="2" width="2" height="20" fill="var(--brand-400)" />
-    <rect x="14" y="6" width="2" height="12" fill="var(--brand-400)" />
-    <rect x="18" y="10" width="2" height="4" fill="var(--brand-300)" />
-  </svg>
-);
 
 /**
  * Read one of the integration's queue sensors out of the state machine. Matched
@@ -119,8 +110,12 @@ export function App({ hass, narrow }) {
               borderBottom: "1px solid var(--border-subtle)",
             }}
           >
-            {LOGO}
-            <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: -0.02 }}>Intentsity</span>
+            <BrandMark />
+            {/* The wordmark is live text, not `logo.svg`: the design system sets
+                it in dark ink, which vanishes on the dark theme. */}
+            <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: -0.02 }}>
+              Intent<span style={{ color: "var(--brand-500)" }}>s</span>ity
+            </span>
           </div>
           <SidebarSection title="Workspaces">
             {WORKSPACES.map((entry) => (

@@ -7,7 +7,7 @@ Design system for **Intentsity** — internal tooling for training personal voic
 
 Both are keyboard-first, dense, and read like professional engineering software (Linear, Splice, Audacity, DAWs), not consumer apps.
 
-> **Source materials:** none were attached. The brand, name, and taxonomy above were derived from the user's product description alone. Wherever this design system commits to a specific value (color hex, font, iconography, layout), that value is an *interpretation* and is called out below so it can be corrected.
+> **Source materials:** the brand marks in `assets/` are authoritative. Everything else — name, taxonomy, palette beyond the marks, type, iconography, layout — was derived from the user's product description alone; where this design system commits to a specific value it is an *interpretation*, called out below so it can be corrected.
 
 ---
 
@@ -68,7 +68,10 @@ Examples that fit / examples that break the brand are in `cards/brand-voice.html
 
 ## Assets
 
-- **No logo was supplied.** The wordmark used across the system is `Intentsity` set in Plex Sans 700 tight, paired with a five-bar waveform glyph rendered inline. Do **not** treat this as a real logo — see `cards/brand-wordmark.html`. Please supply real mark files.
+- **`assets/icon.svg`** — the app mark: a six-bar waveform in near-black on a brand-gradient squircle (112/512 corner radius), with a `--brand-300` dot marking the detection point. Use it wherever a square avatar or favicon is wanted. It is self-contained; the gradient id is `bg`, so namespace it if you inline several copies into one document.
+- **`assets/logo.svg`** — the horizontal lockup: the same mark on graphite, plus the wordmark in Plex Sans 700 at -4 letter-spacing, `s` in `--brand-800`. The wordmark is **live text**, so rendering it outside a browser needs IBM Plex Sans installed or the text converted to paths.
+- The lockup's ink is dark on transparent, so it **does not survive a dark background**. On dark surfaces use `icon.svg` plus the wordmark as styled text — that is what the Home Assistant panel does. A light-ink variant has not been supplied.
+- Rasterized PNGs for Home Assistant live at `custom_components/intentsity/brand/`; they are generated from these SVGs, not drawn separately.
 
 ---
 
@@ -110,6 +113,6 @@ Everything else is a standard baseline set (Button, Input, Select, …) because 
 
 1. **No source materials were attached** — this is designed from the product description alone. Names, taxonomy, fonts, colors, and layout are all interpretations.
 2. **Fonts substituted** — IBM Plex Sans + Mono via Google Fonts. Replace with real product fonts when supplied.
-3. **No logo** — wordmark is plain type + a generic 5-bar glyph.
+3. **Logo supplied** — `assets/icon.svg` and `assets/logo.svg` are the real marks. Anywhere the older cards still draw an inline 5-bar glyph (`cards/brand-wordmark.html`) is out of date.
 4. **No icon set** — inline stroke SVGs only; connect Lucide or your own icons.
 5. **Dark mode** shipped as opt-in via `[data-theme="dark"]` — both UI kits include a theme toggle in the sidebar footer for verification.
