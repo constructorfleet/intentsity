@@ -1,0 +1,248 @@
+name: Tag Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    paths:
+      - pyproject.toml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Two merges landing at once would both bump from the same base version and race
+# to push, so tagging is serialized.
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  # Bumps the version on a merged, labelled pull request and tags the result.
+  # Skipped entirely for a direct push to main, where the version is whatever
+  # the pushed commit says.
+  version:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # The merge already landed, so release from the branch, not from the
+          # pull request's ephemeral merge ref.
+          ref: main
+
+      - name: Pick the bump from the pull request's labels
+        id: label
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          labels = {name.lower() for name in json.loads(os.environ["LABELS"])}
+
+          # Most significant label wins, so "breaking" plus a stray "patch" is
+          # still a major release.
+          for part, names in (
+              ("major", {"breaking", "major"}),
+              ("minor", {"minor"}),
+              ("patch", {"patch"}),
+          ):
+              if labels & names:
+                  break
+          else:
+              part = ""
+              print("::notice::No breaking/major/minor/patch label — no release")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"part={part}\n")
+          PY
+
+      - uses: astral-sh/setup-uv@v5
+        if: steps.label.outputs.part != ''
+        with:
+          enable-cache: true
+
+      # The panel embeds its version at build time, so a bump means a rebuilt
+      # bundle — otherwise the sidebar reports the previous release.
+      - uses: actions/setup-node@v4
+        if: steps.label.outputs.part != ''
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Compute the new version
+        id: bump
+        if: steps.label.outputs.part != ''
+        env:
+          PART: ${{ steps.label.outputs.part }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          import tomllib
+          from pathlib import Path
+
+          pyproject = Path("pyproject.toml")
+          current = tomllib.loads(pyproject.read_text())["project"]["version"]
+
+          def tag_exists(version: str) -> bool:
+              return subprocess.run(
+                  ["git", "rev-parse", "-q", "--verify", f"refs/tags/v{version}"],
+                  capture_output=True,
+              ).returncode == 0
+
+          # A pull request is allowed to set the version by hand. If the version
+          # on main has never been tagged, that is what happened — release it as
+          # it stands rather than bumping on top of a deliberate choice.
+          if tag_exists(current):
+              parts = current.split(".")
+              if len(parts) != 3 or not all(p.isdigit() for p in parts):
+                  raise SystemExit(f"Unsupported version format: {current}")
+              major, minor, patch = (int(p) for p in parts)
+              version = {
+                  "major": f"{major + 1}.0.0",
+                  "minor": f"{major}.{minor + 1}.0",
+                  "patch": f"{major}.{minor}.{patch + 1}",
+              }[os.environ["PART"]]
+
+              pyproject.write_text(
+                  re.sub(
+                      r'(?m)^version = ".*"$',
+                      f'version = "{version}"',
+                      pyproject.read_text(),
+                      count=1,
+                  )
+              )
+
+              # manifest.json is what Home Assistant and HACS read; package.json
+              # is what the panel bundle reports. All three must agree.
+              for path in (
+                  Path("custom_components/intentsity/manifest.json"),
+                  Path("frontend/package.json"),
+              ):
+                  text = path.read_text()
+                  updated = re.sub(
+                      r'(?m)^(\s*)"version": ".*"',
+                      lambda m: f'{m.group(1)}"version": "{version}"',
+                      text,
+                      count=1,
+                  )
+                  if json.loads(updated)["version"] != version:
+                      raise SystemExit(f"Failed to rewrite the version in {path}")
+                  path.write_text(updated)
+          else:
+              print(f"::notice::v{current} is untagged — releasing it as-is")
+              version = current
+
+          if tag_exists(version):
+              raise SystemExit(f"Tag v{version} already exists")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"version={version}\n")
+              handle.write(f"tag=v{version}\n")
+          PY
+
+      - name: Re-lock and rebuild
+        if: steps.bump.outputs.version != ''
+        run: |
+          # No-ops when the version was already correct; cheap either way, and it
+          # keeps the lockfile's project version and the bundle honest.
+          uv lock
+          npm ci --prefix frontend
+          npm run --prefix frontend sync-ds
+          npm run --prefix frontend build
+
+      - name: Commit, tag, and push
+        if: steps.bump.outputs.version != ''
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Nothing to commit; tagging the current commit"
+          else
+            git add -A
+            git commit -m "chore(release): ${TAG}"
+          fi
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          # Atomic: a tag that outlives a rejected branch push points at a commit
+          # nobody can fetch.
+          git push --atomic origin HEAD:main "refs/tags/${TAG}"
+
+      # `workflow_run` gives the Release workflow this run's id but none of its
+      # outputs, so the tag travels as an artifact. Its presence is also the
+      # signal that there is anything to release at all.
+      - name: Publish the tag for the Release workflow
+        if: steps.bump.outputs.version != ''
+        run: echo "${{ steps.bump.outputs.tag }}" > release-tag.txt
+
+      - uses: actions/upload-artifact@v4
+        if: steps.bump.outputs.version != ''
+        with:
+          name: release-tag
+          path: release-tag.txt
+          retention-days: 1
+
+  # Tags a hand-edited version pushed straight to main, and is a no-op when the
+  # version job already tagged this release.
+  tag:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read the version
+        id: version
+        run: |
+          python - <<'PY'
+          import os
+          import subprocess
+          import tomllib
+          from pathlib import Path
+
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          exists = subprocess.run(
+              ["git", "rev-parse", "-q", "--verify", f"refs/tags/v{version}"],
+              capture_output=True,
+          ).returncode == 0
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"tag={'' if exists else f'v{version}'}\n")
+
+          if exists:
+              print(f"::notice::v{version} is already tagged")
+          PY
+
+      - name: Push the tag
+        if: steps.version.outputs.tag != ''
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "refs/tags/${TAG}"
+
+      - name: Publish the tag for the Release workflow
+        if: steps.version.outputs.tag != ''
+        run: echo "${{ steps.version.outputs.tag }}" > release-tag.txt
+
+      - uses: actions/upload-artifact@v4
+        if: steps.version.outputs.tag != ''
+        with:
+          name: release-tag
+          path: release-tag.txt
+          retention-days: 1

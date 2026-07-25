@@ -1,28 +1,57 @@
 name: Release
 
+# Chained off Tag Release rather than off the tag push: a push made with
+# GITHUB_TOKEN never triggers another workflow, but `workflow_run` fires
+# regardless of who authenticated the run that produced it.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - pyproject.toml
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["Tag Release"]
+    types:
+      - completed
 
 permissions:
   contents: write
 
 jobs:
   release:
+    # A run that tagged nothing uploads no artifact, so the download step below
+    # is what decides whether there is a release to cut.
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Fetch the tag from the run that produced it
+        id: tag
+        uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
-          fetch-depth: 0
+          name: release-tag
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # HACS reads the version from manifest.json; the tag comes from
+      - name: Read the tag
+        id: read
+        if: steps.tag.outcome == 'success'
+        run: |
+          TAG=$(cat release-tag.txt)
+          if [ -z "${TAG}" ]; then
+            echo "::error::release-tag artifact is empty"
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      # By tag, not by branch: main may already have moved on, and the release
+      # must describe the commit that was tagged.
+      - uses: actions/checkout@v4
+        if: steps.read.outputs.tag != ''
+        with:
+          ref: ${{ steps.read.outputs.tag }}
+
+      # HACS installs the version in manifest.json; the tag comes from
       # pyproject.toml. A mismatch ships a release nobody can install cleanly.
-      - name: Read and cross-check the version
-        id: version
+      - name: Cross-check the versions
+        if: steps.read.outputs.tag != ''
+        env:
+          TAG: ${{ steps.read.outputs.tag }}
         run: |
           python - <<'PY'
           import json
@@ -30,39 +59,25 @@ jobs:
           import tomllib
           from pathlib import Path
 
-          pyproject = tomllib.loads(Path("pyproject.toml").read_text())
-          version = pyproject["project"]["version"]
-
-          manifest = json.loads(
-              Path("custom_components/intentsity/manifest.json").read_text()
-          )
-          if manifest["version"] != version:
-              raise SystemExit(
-                  f"manifest.json is {manifest['version']} but pyproject.toml is {version}"
-              )
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
-              handle.write(f"version={version}\n")
+          expected = os.environ["TAG"].removeprefix("v")
+          versions = {
+              "pyproject.toml": tomllib.loads(
+                  Path("pyproject.toml").read_text()
+              )["project"]["version"],
+              "manifest.json": json.loads(
+                  Path("custom_components/intentsity/manifest.json").read_text()
+              )["version"],
+              "frontend/package.json": json.loads(
+                  Path("frontend/package.json").read_text()
+              )["version"],
+          }
+          wrong = {name: v for name, v in versions.items() if v != expected}
+          if wrong:
+              raise SystemExit(f"Expected {expected} everywhere, found {wrong}")
           PY
 
-      - name: Create tag
-        id: tag
-        run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          git config --global user.email "github-bot@github.com"
-          git config --global user.name "github-bot"
-          if git rev-parse "${TAG}" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists"
-            echo "created=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git tag -a "${TAG}" -m "Release ${TAG}"
-          git push origin "${TAG}"
-          echo "created=true" >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub release
-        if: steps.tag.outputs.created == 'true'
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
+        if: steps.read.outputs.tag != ''
         with:
-          tag_name: v${{ steps.version.outputs.version }}
+          tag_name: ${{ steps.read.outputs.tag }}
           generate_release_notes: true
