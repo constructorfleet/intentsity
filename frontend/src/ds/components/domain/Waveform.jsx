@@ -23,7 +23,7 @@ export function Waveform({
   return (
     <div ref={ref} onClick={scrub}
       style={{
-        position:'relative', height, display:'flex', alignItems:'center',
+        position:'relative', height, width:'100%', display:'flex', alignItems:'center',
         gap:barGap, cursor: onScrub ? 'pointer' : 'default',
         userSelect:'none', ...style
       }}>
@@ -37,9 +37,9 @@ export function Waveform({
       )}
       {data.map((h,i) => (
         <div key={i} style={{
-          width:barWidth, height: `${h*100}%`, minHeight:2,
+          flex:'1 1 0', minWidth:barWidth, height: `${h*100}%`, minHeight:2,
           background: playhead != null && i/data.length < playhead ? fill : 'var(--waveform-track)',
-          borderRadius:1, flex:'0 0 auto',
+          borderRadius:1,
           transition:'background var(--dur-fast)'
         }}/>
       ))}

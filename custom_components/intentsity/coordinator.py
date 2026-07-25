@@ -154,9 +154,7 @@ class IntentsityCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         pipeline_run: PipelineRunDebug,
         pipeline_run_id: str,
     ) -> Chat | None:
-        all_chat_logs = self.hass.data[DATA_CHAT_LOGS]
-        if not all_chat_logs:
-            return None
+        all_chat_logs = self.hass.data.get(DATA_CHAT_LOGS, {})
         chat: Chat | None = None
         chat_ended = False
         for event in [

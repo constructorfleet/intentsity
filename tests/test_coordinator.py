@@ -270,9 +270,10 @@ def test_process_pipeline_run_prepends_system_content(hass: HomeAssistant) -> No
 
 
 def test_process_pipeline_run_without_chat_logs(hass: HomeAssistant) -> None:
-    hass.data[DATA_CHAT_LOGS] = {}
     coordinator = IntentsityCoordinator(hass)
-    assert coordinator._process_pipeline_run(_full_run(), "run-1") is None
+    chat = coordinator._process_pipeline_run(_full_run(), "run-1")
+    assert chat is not None
+    assert [message.sender for message in chat.messages] == ["user", "assistant", "assistant"]
 
 
 def test_process_pipeline_run_without_a_matching_log(hass: HomeAssistant) -> None:
