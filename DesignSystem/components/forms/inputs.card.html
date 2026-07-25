@@ -1,0 +1,24 @@
+<!-- @dsCard group="Components" viewport="700x260" name="Inputs" subtitle="Input · Textarea · Select — with prefix, invalid, disabled" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:24px;background:var(--surface-panel);font-family:var(--font-sans)}
+.grid{display:grid; grid-template-columns:1fr 1fr; gap:14px 20px}
+.lbl{font-family:var(--font-mono);font-size:10px;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;display:block}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const { Input, Textarea, Select } = window.WaveformDesignSystem_606875;
+const Search = () => <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M11 11l3 3"/></svg>;
+function App(){ return <div className="grid">
+<div><span className="lbl">Default</span><Input placeholder="hey atlas" /></div>
+<div><span className="lbl">With prefix</span><Input placeholder="search clips" prefix={<Search/>} /></div>
+<div><span className="lbl">Invalid</span><Input invalid defaultValue="   " /></div>
+<div><span className="lbl">Disabled</span><Input disabled defaultValue="wake-v3.2.1" /></div>
+<div><span className="lbl">Select</span><Select style={{width:'100%'}} options={[{value:'v3',label:'wake-atlas-v3.2.1'},{value:'v2',label:'wake-atlas-v2.4.0'}]}/></div>
+<div><span className="lbl">Size — sm</span><Input size="sm" placeholder="dense filter" /></div>
+<div style={{gridColumn:'1 / -1'}}><span className="lbl">Textarea</span><Textarea placeholder="Edited assistant response…" defaultValue="Turning on the kitchen lights." /></div>
+</div>; }
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

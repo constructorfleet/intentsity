@@ -1,0 +1,4 @@
+:root{
+  --r-none:0;/* @kind radius */ --r-sm:3px; --r-md:5px; --r-lg:8px; --r-xl:12px;
+  --r-2xl:16px; --r-pill:999px;
+}

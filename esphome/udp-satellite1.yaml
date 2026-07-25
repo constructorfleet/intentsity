@@ -1,0 +1,98 @@
+# Intentsity capture over UDP — the recommended transport.
+#
+# The satellite1 `wake_audio_stream` component taps microWakeWord's audio
+# trigger, so it streams the exact PCM the models see (int16 / mono / 16 kHz),
+# including audio where no wake word fired. That negative audio is what you need
+# for false-negative training data.
+#
+# Wake detections are reported over the Intentsity webhook, so this setup needs
+# no MQTT broker at all. Copy the webhook URL from the panel's Assistants panel
+# and paste it below.
+#
+# Substitutions to change before flashing: everything in <angle brackets>.
+
+substitutions:
+  name: kitchen
+  friendly_name: Kitchen Satellite
+  # The Home Assistant host, and the UDP port from Intentsity's options flow.
+  intentsity_host: <192.168.1.10>
+  intentsity_udp_port: "6056"
+  # Settings > Devices & Services > Intentsity, or the panel's Assistants list.
+  intentsity_webhook: <https://homeassistant.local:8123/api/webhook/YOUR_WEBHOOK_ID>
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: <YOUR_API_ENCRYPTION_KEY>
+
+ota:
+  - platform: esphome
+    password: <YOUR_OTA_PASSWORD>
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: ${name} Fallback
+
+captive_portal:
+
+# Needed to POST the wake event to the Intentsity webhook.
+http_request:
+  verify_ssl: false
+
+# Reviewers should be able to stop capture without reflashing. Everything below
+# is gated on this switch, so audio only leaves the device when it is on.
+switch:
+  - platform: template
+    id: wake_audio_capture
+    name: Capture wake-word audio
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+microphone:
+  - platform: i2s_audio
+    id: mic
+    i2s_din_pin: GPIO26
+    adc_type: external
+    pdm: false
+    channel: left
+    sample_rate: 16000
+    bits_per_sample: 16bit
+
+i2s_audio:
+  - id: i2s_bus
+    i2s_lrclk_pin: GPIO25
+    i2s_bclk_pin: GPIO33
+
+# From the satellite1-esphome repository. It frames each datagram with the node
+# name and its audio format (a "WWD2" packet), so the assistant ID and sample
+# rate survive a UDP proxy such as Traefik.
+wake_audio_stream:
+  id: wake_audio_streamer
+  ip_address: ${intentsity_host}
+  port: ${intentsity_udp_port}
+  buffer_duration: 500ms
+
+micro_wake_word:
+  id: mww
+  microphone: mic
+  models:
+    - model: okay_nabu
+  on_wake_word_detected:
+    - if:
+        condition:
+          switch.is_on: wake_audio_capture
+        then:
+          # Intentsity keeps `pre_wake_duration_seconds` of buffered audio from
+          # before this moment, so the clip includes the wake word itself.
+          - http_request.post:
+              url: !lambda |-
+                return "${intentsity_webhook}?assistant_id=${name}&wake_word=" + wake_word;
+              capture_response: false

@@ -1,0 +1,24 @@
+{
+  "name": "intentsity-panel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Home Assistant sidebar panel for Intentsity: wake-word annotation and Assist intent training",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "sync-ds": "node sync-ds.mjs",
+    "check": "node build.mjs --check"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

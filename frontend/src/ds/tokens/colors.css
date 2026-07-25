@@ -1,0 +1,35 @@
+:root{
+  /* Neutral scale — cool graphite */
+  --gray-0:#ffffff;
+  --gray-25:#fafafa;
+  --gray-50:#f4f5f6;
+  --gray-100:#e9ebee;
+  --gray-200:#d5d8dd;
+  --gray-300:#b4b9c2;
+  --gray-400:#8a909c;
+  --gray-500:#616774;
+  --gray-600:#464c58;
+  --gray-700:#2f343d;
+  --gray-800:#1e2229;
+  --gray-900:#141720;
+  --gray-950:#0a0c11;
+
+  /* Brand — signal cyan */
+  --brand-50:#e3fbf7;
+  --brand-100:#c0f4ec;
+  --brand-200:#87e8db;
+  --brand-300:#48d7c4;
+  --brand-400:#1dbfae;
+  --brand-500:#12a394;
+  --brand-600:#0e8378;
+  --brand-700:#0c6960;
+  --brand-800:#0a544c;
+  --brand-900:#08403a;
+
+  /* Semantic — annotation labels double as feedback colors */
+  --tp-500:#10b981; --tp-600:#059669; --tp-050:#e6f7f0; /* True positive — emerald */
+  --tn-500:#3b82f6; --tn-600:#2563eb; --tn-050:#e8f0ff; /* True negative — blue */
+  --fp-500:#ef4444; --fp-600:#dc2626; --fp-050:#fdecec; /* False positive — red */
+  --fn-500:#f59e0b; --fn-600:#d97706; --fn-050:#fef3e0; /* False negative — amber */
+  --bg-500:#8b5cf6; --bg-600:#7c3aed; --bg-050:#f0eaff; /* Background noise — violet */
+}

@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+pytest.xml
+pytest-coverage.txt
+htmlcov/
+
+frontend/node_modules/
+
+# Local Home Assistant test/dev config: the database and captured clips.
+config/
+
+.DS_Store

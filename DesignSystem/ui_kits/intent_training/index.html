@@ -1,0 +1,197 @@
+<!-- @dsCard group="Intent Trainer" viewport="1280x780" name="Intent Trainer — editor" subtitle="Real conversation with editable tools and responses" -->
+<!-- @startingPoint section="Screens" subtitle="Intent training conversation editor" viewport="1280x800" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Intent Trainer</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:var(--surface-app)}
+#root{height:100vh}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const { Sidebar, SidebarSection, SidebarItem, Toolbar, ToolbarSeparator, ToolbarSpacer,
+  Button, IconButton, Badge, Card, Tabs, KeyValue, Input, Textarea, Kbd, StatCell,
+  ConversationTurn, ToolInvocation, Tag, Switch, Tooltip } = window.WaveformDesignSystem_606875;
+
+const Ico = ({d, size=14}) => <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">{d.split('|').map((p,i)=><path key={i} d={p}/>)}</svg>;
+
+const sessions = [
+  {id:'s_2a4b', device:'kitchen_hub', time:'11:24', intent:'lights.set', flagged:false},
+  {id:'s_2a4c', device:'bedroom_pixel', time:'11:26', intent:'timer.start', flagged:true},
+  {id:'s_2a4d', device:'office_dot', time:'11:31', intent:'music.play', flagged:false},
+  {id:'s_2a4e', device:'car_mount', time:'11:44', intent:'navigation.start', flagged:false},
+  {id:'s_2a4f', device:'kitchen_hub', time:'12:02', intent:'lights.set', flagged:false},
+  {id:'s_2a50', device:'living_hub', time:'12:19', intent:'weather.query', flagged:false},
+  {id:'s_2a51', device:'kitchen_hub', time:'12:33', intent:'unknown', flagged:true},
+];
+
+function Trainer(){
+  const [selId, setSelId] = React.useState('s_2a4b');
+  const [tab, setTab] = React.useState('all');
+  const [theme, setTheme] = React.useState('light');
+  const [notes, setNotes] = React.useState('User expected the light to dim gradually — original response was too abrupt. Edited to explicitly acknowledge the "slowly" qualifier.');
+  const [assistantText, setAssistantText] = React.useState('Turning on the kitchen lights, easing to 40% over 2 seconds.');
+  const [toolArgs, setToolArgs] = React.useState('{\n  "room": "kitchen",\n  "on": true,\n  "brightness": 40,\n  "transition_ms": 2000\n}');
+
+  return (
+    <div data-theme={theme} style={{display:'flex', height:'100vh', background:'var(--surface-app)', color:'var(--text-body)', fontFamily:'var(--font-sans)'}}>
+      <Sidebar>
+        <div style={{padding:'14px 12px', display:'flex', alignItems:'center', gap:8, borderBottom:'1px solid var(--border-subtle)'}}>
+          <svg width="18" height="18" viewBox="0 0 24 24"><rect x="2" y="10" width="2" height="4" fill="var(--brand-500)"/><rect x="6" y="6" width="2" height="12" fill="var(--brand-500)"/><rect x="10" y="2" width="2" height="20" fill="var(--brand-400)"/><rect x="14" y="6" width="2" height="12" fill="var(--brand-400)"/><rect x="18" y="10" width="2" height="4" fill="var(--brand-300)"/></svg>
+          <span style={{fontWeight:700, fontSize:14, letterSpacing:-0.02}}>Intentsity</span>
+        </div>
+        <SidebarSection title="Workspaces">
+          <SidebarItem icon={<Ico d="M2 8h12M8 2v12"/>} badge={128}>Wake word</SidebarItem>
+          <SidebarItem icon={<Ico d="M2 4h12M2 8h12M2 12h8"/>} active badge={42}>Intent training</SidebarItem>
+        </SidebarSection>
+        <SidebarSection title="Intent taxonomy">
+          <SidebarItem icon={<Ico d="M8 2v12M2 8h12" size={11}/>} active badge={14}>lights.set</SidebarItem>
+          <SidebarItem badge={8}>timer.start</SidebarItem>
+          <SidebarItem badge={6}>music.play</SidebarItem>
+          <SidebarItem badge={4}>navigation.start</SidebarItem>
+          <SidebarItem badge={3}>weather.query</SidebarItem>
+          <SidebarItem badge={7}>unknown</SidebarItem>
+        </SidebarSection>
+        <SidebarSection title="Fine-tune runs">
+          <SidebarItem>atlas-llm-v1.4 · queued</SidebarItem>
+          <SidebarItem>atlas-llm-v1.3 · deployed</SidebarItem>
+        </SidebarSection>
+      </Sidebar>
+
+      <div style={{flex:1, display:'flex', flexDirection:'column', minWidth:0}}>
+        <Toolbar>
+          <span style={{fontSize:12, color:'var(--text-muted)'}}>Intent</span>
+          <span style={{fontSize:12, color:'var(--text-subtle)'}}>/</span>
+          <span style={{fontWeight:600, fontSize:14, fontFamily:'var(--font-mono)'}}>lights.set</span>
+          <Badge tone="brand">14 sessions</Badge>
+          <ToolbarSeparator/>
+          <Input size="sm" placeholder="Search transcripts…" style={{width:240}} prefix={<Ico d="M7 2a5 5 0 100 10 5 5 0 000-10zM11.5 11.5L14 14" size={12}/>}/>
+          <ToolbarSpacer/>
+          <Button size="sm" variant="ghost" iconLeft={<Ico d="M3 8h10M8 3v10" size={11}/>}>Add example</Button>
+          <Button size="sm" variant="primary">Queue fine-tune</Button>
+        </Toolbar>
+
+        <div style={{flex:1, display:'flex', minHeight:0}}>
+          {/* SESSION LIST */}
+          <div style={{width:280, minWidth:280, borderRight:'1px solid var(--border-subtle)', background:'var(--surface-panel)', display:'flex', flexDirection:'column'}}>
+            <div style={{padding:'8px 12px', borderBottom:'1px solid var(--border-subtle)'}}>
+              <Tabs value={tab} onChange={setTab} tabs={[
+                {value:'all', label:'All', count:14},
+                {value:'flagged', label:'Flagged', count:2},
+                {value:'edited', label:'Edited', count:5},
+              ]}/>
+            </div>
+            <div style={{flex:1, overflow:'auto'}}>
+              {sessions.map(s => {
+                const active = s.id === selId;
+                return (
+                  <button key={s.id} onClick={()=>setSelId(s.id)}
+                    style={{
+                      display:'block', width:'100%', padding:'12px 14px',
+                      border:'none', textAlign:'left',
+                      background: active ? 'var(--accent-quiet)' : 'transparent',
+                      borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent',
+                      borderBottom:'1px solid var(--border-subtle)',
+                      cursor:'pointer', color:'var(--text-body)'
+                    }}>
+                    <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:4}}>
+                      <span style={{fontFamily:'var(--font-mono)', fontSize:12, fontWeight:500}}>{s.id}</span>
+                      {s.flagged && <Badge tone="fn" dot style={{height:16, fontSize:9}}>flag</Badge>}
+                    </div>
+                    <div style={{fontSize:12, color:'var(--text-body)', marginBottom:2, fontFamily:'var(--font-mono)'}}>{s.intent}</div>
+                    <div style={{fontSize:11, color:'var(--text-muted)'}}>{s.device} · {s.time}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* CONVERSATION EDITOR */}
+          <div style={{flex:1, display:'flex', minWidth:0}}>
+            <div style={{flex:1, padding:24, overflow:'auto', display:'flex', flexDirection:'column', gap:14, minWidth:0}}>
+              <div style={{display:'flex', alignItems:'center', gap:10}}>
+                <h2 style={{margin:0, fontSize:18, fontWeight:600}}>Session {selId}</h2>
+                <Badge mono>lights.set</Badge>
+                <Tag>device=kitchen_hub</Tag>
+                <Tag>lang=en-US</Tag>
+                <ToolbarSpacer/>
+                <Button size="sm" variant="ghost">Discard edits</Button>
+              </div>
+
+              <ConversationTurn role="system" timestamp="turn 0">Session started · kitchen_hub · 12:02:14</ConversationTurn>
+
+              <ConversationTurn role="user" timestamp="0.4s">turn on the kitchen lights, slowly</ConversationTurn>
+
+              <div>
+                <div style={{fontSize:11, color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'var(--tracking-caps)', fontWeight:600, marginBottom:6, fontFamily:'var(--font-mono)'}}>Tool call — editable</div>
+                <ToolInvocation name="lights.set" status="ok" args={toolArgs} result={{ok:true, applied_at:'0.9s'}}/>
+                <Textarea style={{marginTop:8, fontFamily:'var(--font-mono)', fontSize:12}} minRows={5} value={toolArgs} onChange={e=>setToolArgs(e.target.value)}/>
+              </div>
+
+              <div>
+                <div style={{fontSize:11, color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'var(--tracking-caps)', fontWeight:600, marginBottom:6, fontFamily:'var(--font-mono)'}}>Assistant response — editable</div>
+                <ConversationTurn role="assistant" timestamp="1.1s">{assistantText}</ConversationTurn>
+                <Textarea style={{marginTop:8}} minRows={2} value={assistantText} onChange={e=>setAssistantText(e.target.value)}/>
+              </div>
+
+              <ConversationTurn role="user" timestamp="4.2s">that's perfect, thanks</ConversationTurn>
+
+              <div style={{marginTop:8}}>
+                <div style={{fontSize:11, color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'var(--tracking-caps)', fontWeight:600, marginBottom:6, fontFamily:'var(--font-mono)'}}>Trainer notes</div>
+                <Textarea minRows={3} value={notes} onChange={e=>setNotes(e.target.value)}/>
+              </div>
+
+              <div style={{display:'flex', gap:8, paddingTop:8}}>
+                <Button variant="primary">Save & next</Button>
+                <Button variant="ghost">Skip</Button>
+                <ToolbarSpacer/>
+                <div style={{fontSize:12, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:6}}>
+                  <Kbd>⌘S</Kbd> save<Kbd>⌘⇧F</Kbd> flag
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT INSPECTOR */}
+            <div style={{width:280, minWidth:280, borderLeft:'1px solid var(--border-subtle)', background:'var(--surface-panel)', padding:16, overflow:'auto', display:'flex', flexDirection:'column', gap:16}}>
+              <div>
+                <div style={{fontSize:11, color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'var(--tracking-caps)', fontWeight:600, marginBottom:10}}>Intent metadata</div>
+                <KeyValue items={[
+                  {k:'Intent', v:'lights.set', mono:true},
+                  {k:'Confidence', v:'0.94', mono:true},
+                  {k:'Slots', v:'room, brightness, transition'},
+                  {k:'LLM version', v:'atlas-llm-v1.3', mono:true},
+                  {k:'Device', v:'kitchen_hub'},
+                ]}/>
+              </div>
+              <div>
+                <div style={{fontSize:11, color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'var(--tracking-caps)', fontWeight:600, marginBottom:10}}>Slot values</div>
+                <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
+                  <Tag>room=kitchen</Tag>
+                  <Tag>brightness=40</Tag>
+                  <Tag>transition_ms=2000</Tag>
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:11, color:'var(--text-subtle)', textTransform:'uppercase', letterSpacing:'var(--tracking-caps)', fontWeight:600, marginBottom:10}}>Training impact</div>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:14}}>
+                  <StatCell label="Similar" value="42" unit="sessions"/>
+                  <StatCell label="Precision" value="0.941" delta="+0.03" deltaTone="up"/>
+                </div>
+              </div>
+              <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                <Switch label="Include in next fine-tune" defaultChecked/>
+                <Switch label="Use as golden example"/>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Trainer/>);
+
+</script>
+</body></html>

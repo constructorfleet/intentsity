@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - pyproject.toml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # HACS reads the version from manifest.json; the tag comes from
+      # pyproject.toml. A mismatch ships a release nobody can install cleanly.
+      - name: Read and cross-check the version
+        id: version
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import tomllib
+          from pathlib import Path
+
+          pyproject = tomllib.loads(Path("pyproject.toml").read_text())
+          version = pyproject["project"]["version"]
+
+          manifest = json.loads(
+              Path("custom_components/intentsity/manifest.json").read_text()
+          )
+          if manifest["version"] != version:
+              raise SystemExit(
+                  f"manifest.json is {manifest['version']} but pyproject.toml is {version}"
+              )
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"version={version}\n")
+          PY
+
+      - name: Create tag
+        id: tag
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          git config --global user.email "github-bot@github.com"
+          git config --global user.name "github-bot"
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        if: steps.tag.outputs.created == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true

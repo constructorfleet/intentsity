@@ -1,0 +1,86 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read # For checkout and comparing commits
+  pull-requests: write # For creating/updating PR comments
+
+jobs:
+  validate-hacs:
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: HACS validation
+        uses: "hacs/action@main"
+        with:
+          category: "integration"
+          ignore: "brands"
+
+  validate-hassfest:
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - uses: "home-assistant/actions/hassfest@master"
+
+  validate-python:
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - uses: "astral-sh/setup-uv@v5"
+        with:
+          enable-cache: true
+      # `requires-python` pins 3.13 to match the Home Assistant release the
+      # tests run against; uv installs it rather than relying on the runner.
+      - name: Install dependencies
+        run: uv sync --locked --dev
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format
+        run: uv run ruff format --check .
+      - name: Pytest + coverage
+        run: |
+          uv run pytest \
+            --junitxml=pytest.xml \
+            --cov=custom_components.intentsity \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=90 \
+            | tee pytest-coverage.txt
+      - name: Coverage comment
+        if: github.event_name == 'pull_request'
+        uses: MishaKav/pytest-coverage-comment@main
+        with:
+          pytest-coverage-path: pytest-coverage.txt
+          junitxml-path: pytest.xml
+          hide-comment: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  validate-frontend:
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - uses: "actions/setup-node@v4"
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Re-vendor the design system
+        working-directory: frontend
+        run: npm run sync-ds
+      - name: Build the panel
+        working-directory: frontend
+        run: npm run build
+      # HACS ships `panel.js` as committed, so a stale artifact means users get
+      # a bundle that does not match the sources in the same commit.
+      - name: Check the committed bundle is current
+        run: |
+          if ! git diff --exit-code --stat -- custom_components/intentsity/panel.js frontend/src/ds; then
+            echo "::error::panel.js or frontend/src/ds is stale — run 'npm run sync-ds && npm run build' in frontend/ and commit the result"
+            exit 1
+          fi

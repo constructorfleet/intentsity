@@ -1,0 +1,9 @@
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--font-sans);color:var(--text-body);background:var(--surface-app);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--text-link);text-decoration:none}
+a:hover{color:var(--text-link-hover)}
+::selection{background:var(--brand-500);color:#00131a}
+@keyframes wf-spin{to{transform:rotate(360deg)}}
+@keyframes wf-pulse{0%,100%{opacity:1}50%{opacity:.4}}

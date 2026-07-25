@@ -1,0 +1,53 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Intentsity",
+        "description": "Adds a sidebar panel for labeling wake-word clips and correcting Assist conversations. Audio capture settings can be changed later under Configure."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Intentsity is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Audio capture",
+        "description": "Devices can send PCM audio over UDP or MQTT. Wake detections arrive on the webhook shown in the panel, or on the MQTT event topic.",
+        "data": {
+          "udp_enabled": "Listen for UDP audio",
+          "udp_port": "UDP port",
+          "udp_assistant_id": "Assistant ID for unlabeled datagrams",
+          "buffer_duration_seconds": "Rolling buffer length (seconds)",
+          "pre_wake_duration_seconds": "Audio kept before a detection (seconds)",
+          "post_wake_duration_seconds": "Audio kept after a detection (seconds)",
+          "sample_rate": "Sample rate (Hz)",
+          "sample_width": "Sample width (bytes)",
+          "channels": "Channels",
+          "mqtt_enabled": "Subscribe to MQTT audio",
+          "mqtt_audio_topic": "MQTT audio topic",
+          "mqtt_event_topic": "MQTT wake event topic",
+          "mqtt_audio_info_topic": "MQTT audio format topic",
+          "retention_days": "Delete clips after (days, 0 to keep forever)"
+        },
+        "data_description": {
+          "udp_assistant_id": "Used only for legacy datagrams that carry no assistant ID. Leave blank to fall back to \"default\".",
+          "sample_rate": "Fallback for senders that do not declare their format. WWD2 packets and audio_info messages override this.",
+          "mqtt_audio_topic": "A single-level + wildcard marks the segment holding the assistant ID.",
+          "retention_days": "Pruning runs twice a day and removes the clip row, WAV, and metadata file."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "uncorrected_chats": {
+        "name": "Uncorrected Assist chats"
+      },
+      "unlabeled_clips": {
+        "name": "Unlabeled wake clips"
+      }
+    }
+  }
+}

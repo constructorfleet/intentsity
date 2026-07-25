@@ -1,0 +1,33 @@
+<!-- @dsCard group="Components" viewport="700x310" name="Card, Tabs, KeyValue" subtitle="Panel container, section switcher, metadata list" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:24px;background:var(--surface-app);font-family:var(--font-sans)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const { Card, Tabs, KeyValue, Button, Badge } = window.WaveformDesignSystem_606875;
+function App(){
+  const [t,setT]=React.useState('unlabeled');
+  return <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16}}>
+  <Card title="Clip c_9f2b04a1" actions={<Badge mono>unlabeled</Badge>}>
+    <KeyValue items={[
+      {k:'Duration', v:'1.24s', mono:true},
+      {k:'Sample rate', v:'16 kHz', mono:true},
+      {k:'Device', v:'kitchen_hub'},
+      {k:'Confidence', v:'0.62', mono:true},
+    ]}/>
+  </Card>
+  <Card title="Session filter" actions={<Button variant="ghost" size="sm">Reset</Button>}>
+    <Tabs value={t} onChange={setT} tabs={[
+      {value:'unlabeled', label:'Unlabeled', count:1284},
+      {value:'labeled', label:'Labeled', count:512},
+      {value:'flagged', label:'Flagged', count:8},
+    ]}/>
+    <div style={{marginTop:12, fontSize:13, color:'var(--text-muted)'}}>Showing <b style={{color:'var(--text-body)', fontFamily:'var(--font-mono)'}}>1,284</b> clips from the last 7 days.</div>
+  </Card>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

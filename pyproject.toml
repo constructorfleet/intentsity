@@ -1,0 +1,82 @@
+[project]
+name = "intentsity"
+version = "1.0.0"
+description = "Home Assistant integration for wake-word annotation and Assist intent training"
+readme = "README.md"
+# Upper bound because homeassistant is pinned exactly below; without it uv also
+# resolves for 3.15+, where only newer pytest-homeassistant-custom-component
+# releases exist and they pin a different Home Assistant.
+requires-python = ">=3.13.2,<3.14"
+dependencies = [
+    # Pinned to the version pytest-homeassistant-custom-component targets: the
+    # integration imports assist_pipeline and conversation internals, which move.
+    "homeassistant==2026.2.3",
+    "numpy>=2.2.2",
+    "orjson>=3.11.3",
+    # Lower bound only: Home Assistant pins these exactly, so a tighter floor
+    # here just makes the resolver unsatisfiable.
+    "pydantic>=2.12.2",
+    "sqlalchemy>=2.0.0",
+    "voluptuous>=0.13.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# Home Assistant's harness captures at INFO, which turns every SQL statement
+# into pages of failure output.
+log_level = "WARNING"
+filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "ASYNC", # blocking calls inside coroutines
+    "B",     # bugbear
+    "C4",
+    "E",
+    "F",
+    "I",     # import order
+    "PIE",
+    "RUF",
+    "SIM",
+    "UP",
+    "W",
+]
+ignore = [
+    "B008",   # HA passes callables as defaults in voluptuous schemas
+    "RUF012", # HA entity classes use mutable class attributes by convention
+]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["custom_components"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["SIM117"]
+
+[dependency-groups]
+dev = [
+    # In production Home Assistant installs these on demand for the components
+    # Intentsity reads from; the test harness does not, so pin them to the
+    # versions the pinned core asks for.
+    "ha-ffmpeg==3.2.2",
+    "hassil==3.5.0",
+    "home-assistant-intents==2026.1.28",
+    "mutagen==1.47.0",
+    "mypy>=1.19.1",
+    "paho-mqtt==2.1.0",
+    "pymicro-vad==1.0.1",
+    "pyspeex-noise==1.0.2",
+    "pytest-cov>=6.1.0",
+    # Pinned exactly: this release pairs with homeassistant 2026.2.3 above and is
+    # the last one supporting Python 3.13. It also pins pytest and pytest-asyncio,
+    # so those are left for it to resolve.
+    "pytest-homeassistant-custom-component==0.13.316",
+    "ruff>=0.14.13",
+]

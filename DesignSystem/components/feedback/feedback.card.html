@@ -1,0 +1,42 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Badges, Tags, Toasts" subtitle="Status pills and ephemeral messages" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:24px;background:var(--surface-panel);font-family:var(--font-sans)}
+.row{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:14px}
+.lbl{font-family:var(--font-mono);font-size:10px;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.08em;width:90px;flex-shrink:0}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const { Badge, Tag, Toast, Tooltip, LabelChip, Button } = window.WaveformDesignSystem_606875;
+function App(){
+  return <div>
+    <div className="row"><span className="lbl">Badge</span>
+      <Badge tone="tp" dot>True positive</Badge>
+      <Badge tone="fp" dot>False positive</Badge>
+      <Badge tone="bgnoise" dot>Background</Badge>
+      <Badge tone="brand">128 new</Badge>
+      <Badge mono>wake-v3.2.1</Badge>
+    </div>
+    <div className="row"><span className="lbl">LabelChip</span>
+      <LabelChip tone="tp" selected shortcut="1">True positive</LabelChip>
+      <LabelChip tone="fp" shortcut="3">False positive</LabelChip>
+      <LabelChip tone="bgnoise" shortcut="5">Background</LabelChip>
+    </div>
+    <div className="row"><span className="lbl">Tag</span>
+      <Tag onRemove={()=>{}}>intent=play_music</Tag>
+      <Tag>device=kitchen_hub</Tag>
+      <Tag>lang=en-US</Tag>
+    </div>
+    <div className="row"><span className="lbl">Tooltip</span>
+      <Tooltip content="Play clip (Space)"><Button size="sm">Hover me</Button></Tooltip>
+    </div>
+    <div className="row" style={{alignItems:'flex-start'}}><span className="lbl" style={{paddingTop:8}}>Toast</span>
+      <Toast tone="success" title="Saved" description="127 clips labelled and queued." onDismiss={()=>{}}/>
+      <Toast tone="warn" title="Drift detected" description="Precision dropped 2.1% since v3.1."/>
+    </div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

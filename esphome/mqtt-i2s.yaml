@@ -1,0 +1,104 @@
+# Intentsity capture over MQTT — for devices without the satellite1
+# `wake_audio_stream` component, or setups that already route everything
+# through a broker.
+#
+# PCM is base64-encoded into MQTT messages, which is considerably more traffic
+# than the UDP transport. Prefer `udp-satellite1.yaml` when you can.
+#
+# The assistant ID is the segment matching `+` in Intentsity's topic patterns,
+# so `assist/debug/kitchen/pcm` buffers under the assistant `kitchen`. Change
+# the patterns in the options flow if you need a different topic layout.
+#
+# Substitutions to change before flashing: everything in <angle brackets>.
+
+substitutions:
+  name: kitchen
+  friendly_name: Kitchen Satellite
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    # Retained, so Intentsity learns this device's format as soon as it
+    # subscribes — even if the device is asleep at the time.
+    - priority: -100
+      then:
+        - mqtt.publish:
+            topic: assist/debug/${name}/audio_info
+            retain: true
+            payload: '{"sample_rate":48000,"bits_per_sample":32,"channels":1}'
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: <YOUR_API_ENCRYPTION_KEY>
+
+ota:
+  - platform: esphome
+    password: <YOUR_OTA_PASSWORD>
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: ${name} Fallback
+
+captive_portal:
+
+mqtt:
+  broker: <192.168.1.10>
+  port: 1883
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+
+switch:
+  - platform: template
+    id: wake_audio_capture
+    name: Capture wake-word audio
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+i2s_audio:
+  - id: i2s_bus
+    i2s_lrclk_pin: GPIO25 # WS on an INMP441
+    i2s_bclk_pin: GPIO33 # SCK
+
+microphone:
+  - platform: i2s_audio
+    id: mic
+    i2s_din_pin: GPIO26 # SD
+    adc_type: external
+    pdm: false
+    channel: left
+    # Must match the audio_info payload published above.
+    sample_rate: 48000
+    bits_per_sample: 32bit
+    on_data:
+      then:
+        - if:
+            condition:
+              switch.is_on: wake_audio_capture
+            then:
+              - mqtt.publish:
+                  topic: assist/debug/${name}/pcm
+                  payload: !lambda return esphome::base64_encode(x);
+
+micro_wake_word:
+  id: mww
+  microphone: mic
+  models:
+    - model: okay_nabu
+  on_wake_word_detected:
+    - if:
+        condition:
+          switch.is_on: wake_audio_capture
+        then:
+          - mqtt.publish:
+              topic: assist/debug/${name}/events
+              # `rate`/`bits`/`channels` are optional here; when present they
+              # update the buffer format before the clip is cut.
+              payload: !lambda |-
+                return "{\"event\":\"wake\",\"wake_word\":\"" + wake_word +
+                       "\",\"rate\":48000,\"bits\":32,\"channels\":1}";

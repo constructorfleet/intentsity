@@ -1,0 +1,44 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Sidebar & Toolbar" subtitle="App frame navigation" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:0;background:var(--surface-app);font-family:var(--font-sans)}
+html,body{height:100%}</style>
+</head><body><div id="root" style="height:300px"></div>
+<script type="text/babel">
+const { Sidebar, SidebarSection, SidebarItem, Toolbar, ToolbarSeparator, ToolbarSpacer, Button, IconButton, Badge } = window.WaveformDesignSystem_606875;
+const Ico = ({d}) => <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d={d}/></svg>;
+function App(){
+  const [n,setN]=React.useState('wake');
+  return <div style={{display:'flex', height:'100%'}}>
+    <Sidebar>
+      <div style={{padding:'14px 12px 6px', display:'flex', alignItems:'center', gap:8, borderBottom:'1px solid var(--border-subtle)'}}>
+        <svg width="18" height="18" viewBox="0 0 24 24"><rect x="2" y="10" width="2" height="4" fill="var(--brand-500)"/><rect x="6" y="6" width="2" height="12" fill="var(--brand-500)"/><rect x="10" y="2" width="2" height="20" fill="var(--brand-400)"/><rect x="14" y="6" width="2" height="12" fill="var(--brand-400)"/><rect x="18" y="10" width="2" height="4" fill="var(--brand-300)"/></svg>
+        <span style={{fontWeight:700, fontSize:14, letterSpacing:-0.02}}>Intentsity</span>
+      </div>
+      <SidebarSection title="Workspaces">
+        <SidebarItem icon={<Ico d="M2 8h12M8 2v12"/>} active={n==='wake'} onClick={()=>setN('wake')} badge={128}>Wake word</SidebarItem>
+        <SidebarItem icon={<Ico d="M2 4h12M2 8h12M2 12h8"/>} active={n==='intent'} onClick={()=>setN('intent')} badge={42}>Intent training</SidebarItem>
+      </SidebarSection>
+      <SidebarSection title="Datasets">
+        <SidebarItem>hey-atlas / prod</SidebarItem>
+        <SidebarItem>hey-atlas / edge</SidebarItem>
+      </SidebarSection>
+    </Sidebar>
+    <div style={{flex:1, display:'flex', flexDirection:'column'}}>
+      <Toolbar>
+        <span style={{fontWeight:600, fontSize:14}}>hey-atlas / prod</span>
+        <Badge tone="brand">128 new</Badge>
+        <ToolbarSeparator/>
+        <Button size="sm" variant="ghost">Filter</Button>
+        <ToolbarSpacer/>
+        <Button size="sm" variant="primary">Save labels</Button>
+      </Toolbar>
+      <div style={{flex:1, background:'var(--surface-app)', padding:20, color:'var(--text-muted)', fontSize:13}}>App content area…</div>
+    </div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>
