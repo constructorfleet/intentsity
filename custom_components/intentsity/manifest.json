@@ -1,6 +1,9 @@
 {
     "domain": "intentsity",
     "name": "Intentsity",
+    "after_dependencies": [
+        "mqtt"
+    ],
     "codeowners": [
         "@teagan42"
     ],
@@ -9,9 +12,6 @@
         "assist_pipeline",
         "http",
         "webhook"
-    ],
-    "after_dependencies": [
-        "mqtt"
     ],
     "documentation": "https://github.com/constructorfleet/intentsity",
     "integration_type": "service",

@@ -58,7 +58,7 @@ Violating any of these is a defect, not a tradeoff.
 | `brand/` | PNGs rasterized from `DesignSystem/assets/`, for the HA brands repo only |
 | `esphome/` | Example device configs, one per transport |
 | `tests/` | Pytest suite. Behavior without a test is broken by default |
-| `.github/workflows/` | `validate.yaml` (HACS, hassfest, python, frontend) and `release.yaml` |
+| `.github/workflows/` | `validate.yaml` (HACS, hassfest, python, frontend), then `tag.yaml` → `release.yaml` |
 
 ## Workflow
 
@@ -176,9 +176,39 @@ regeneration steps are in `brand/README.md`.
 The panel must render correctly on desktop and mobile, and must follow Home Assistant's dark
 mode unless the reviewer has explicitly picked a theme.
 
+## Releases
+
+Releases are driven by pull request labels. Label every PR with exactly one of:
+
+| Label | Effect on `1.4.2` |
+| --- | --- |
+| `breaking` or `major` | `2.0.0` |
+| `minor` | `1.5.0` |
+| `patch` | `1.4.3` |
+
+On merge to `main`, `tag.yaml` bumps `pyproject.toml`, `manifest.json`, and
+`frontend/package.json` together, re-locks, rebuilds `panel.js` (it embeds the version), then
+commits and tags `v<version>`. `release.yaml` chains off it via `workflow_run` and cuts the
+GitHub release with generated notes.
+
+The split exists because a push authenticated with `GITHUB_TOKEN` does not trigger `push` or
+`pull_request` workflows — but `workflow_run` fires regardless. The tag travels between the two
+as a `release-tag` artifact, since `workflow_run` exposes the upstream run's id and not its
+outputs; no artifact means nothing was tagged and the release job does nothing.
+
+- **An unlabelled PR ships nothing.** The merge lands on `main` and no release is cut. That is
+  the intended escape hatch for docs and chores; add a label and re-run **Tag Release** if you
+  wanted one.
+- **To set a version by hand**, edit `pyproject.toml` in the PR. If the version on `main` has
+  never been tagged, the workflow releases it as-is instead of bumping past a deliberate choice.
+  Update the other two files yourself in that case — the cross-check fails otherwise.
+- The three versions must always agree; `release.yaml` refuses to publish if they do not.
+- Releases are serialized by a `tag-release` concurrency group: two merges landing together
+  would otherwise both bump from the same base version and race to push.
+
 ## Release checklist
 
-- [ ] `manifest.json` and `pyproject.toml` versions match and are bumped (release CI enforces this)
+- [ ] The pull request carries a `breaking`/`major`/`minor`/`patch` label, or intentionally none
 - [ ] `uv.lock` re-locked if any dependency moved
 - [ ] `panel.js` rebuilt from current `frontend/src/`
 - [ ] Dependencies pinned to compatible ranges — no bare `*`
