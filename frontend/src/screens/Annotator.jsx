@@ -553,19 +553,17 @@ export function Annotator({ api, onError, onNotify }) {
                       {clip.assistant_id ?? "unknown"} · {formatDateTime(clip.timestamp)}
                     </div>
                   </div>
-                  {clip.sample_rate === 48000 && (
-                    <Tooltip content="Rewrite legacy 48 kHz metadata to 16 kHz without resampling">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={repairClipRate}
-                        iconLeft={<Icon d={ICONS.refresh} size={12} />}
-                      >
-                        Repair 48k to 16k
-                      </Button>
-                    </Tooltip>
-                  )}
+                  <Tooltip content="Rewrite legacy 48 kHz metadata to 16 kHz without resampling">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={repairClipRate}
+                      iconLeft={<Icon d={ICONS.refresh} size={12} />}
+                    >
+                      Change sample rate
+                    </Button>
+                  </Tooltip>
                   <Tooltip content={clip.deleted_at ? "Restore clip" : "Delete clip"}>
                     <IconButton
                       aria-label={clip.deleted_at ? "Restore clip" : "Delete clip"}
