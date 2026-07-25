@@ -35,12 +35,15 @@ def repair_misdeclared_clip_sample_rates(
     clip_id: int | None = None,
     from_rate: int = 48000,
     to_rate: int = 16000,
+    to_sample_width: int = 2,
+    to_channels: int = 1,
     dry_run: bool = True,
 ) -> ClipRateRepairSummary:
-    """Repair legacy clips whose WAV header declares the wrong sample rate.
+    """Repair legacy clips whose WAV header declares the wrong PCM format.
 
-    The legacy bug wrote already-16 kHz PCM into a WAV file marked as 48 kHz,
-    which makes playback and training read the audio three times too fast. This
+    The legacy bug wrote already-16 kHz 16-bit mono PCM into a WAV file marked
+    as 48 kHz, sometimes with inherited 32-bit stereo metadata. That makes
+    playback and training read the audio up to twelve times too fast. This
     rewrites the WAV header and row metadata only; it does not resample audio.
     """
     storage_dir = _storage_dir(config_or_storage_dir)
@@ -84,8 +87,6 @@ def repair_misdeclared_clip_sample_rates(
                 continue
 
             with wave.open(str(wav_path), "rb") as wav_file:
-                channels = wav_file.getnchannels()
-                sample_width = wav_file.getsampwidth()
                 sample_rate = wav_file.getframerate()
                 frames = wav_file.getnframes()
                 pcm = wav_file.readframes(frames)
@@ -95,14 +96,20 @@ def repair_misdeclared_clip_sample_rates(
                 continue
 
             try:
-                dtype = dtype_for_width(sample_width)
+                dtype = dtype_for_width(to_sample_width)
             except ValueError:
                 summary.skipped_unsupported_format += 1
                 continue
 
+            frame_width = to_sample_width * to_channels
+            if len(pcm) % frame_width != 0:
+                summary.skipped_unsupported_format += 1
+                continue
+
+            frames = len(pcm) // frame_width
             array = np.frombuffer(pcm, dtype=dtype)
-            if channels > 1:
-                array = array.reshape(-1, channels)
+            if to_channels > 1:
+                array = array.reshape(-1, to_channels)
             peaks = compute_peaks(array)
             duration = round(frames / to_rate, 4)
 
@@ -120,8 +127,8 @@ def repair_misdeclared_clip_sample_rates(
 
             try:
                 with wave.open(str(temp_path), "wb") as wav_file:
-                    wav_file.setnchannels(channels)
-                    wav_file.setsampwidth(sample_width)
+                    wav_file.setnchannels(to_channels)
+                    wav_file.setsampwidth(to_sample_width)
                     wav_file.setframerate(to_rate)
                     wav_file.writeframes(pcm)
                 temp_path.replace(wav_path)
@@ -141,8 +148,8 @@ def repair_misdeclared_clip_sample_rates(
                 (
                     duration,
                     to_rate,
-                    sample_width,
-                    channels,
+                    to_sample_width,
+                    to_channels,
                     orjson.dumps(peaks).decode() if peaks else None,
                     row["id"],
                 ),
@@ -155,8 +162,8 @@ def repair_misdeclared_clip_sample_rates(
                     {
                         "duration": duration,
                         "sample_rate": to_rate,
-                        "sample_width": sample_width,
-                        "channels": channels,
+                        "sample_width": to_sample_width,
+                        "channels": to_channels,
                         "frames": frames,
                     }
                 )

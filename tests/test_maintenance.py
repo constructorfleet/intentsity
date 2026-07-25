@@ -13,21 +13,30 @@ from custom_components.intentsity.maintenance import repair_misdeclared_clip_sam
 from custom_components.intentsity.models import Clip
 
 
-def _write_wav(path: Path, pcm: bytes, sample_rate: int) -> None:
+def _write_wav(
+    path: Path,
+    pcm: bytes,
+    sample_rate: int,
+    *,
+    sample_width: int = 2,
+    channels: int = 1,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(path), "wb") as wav_file:
-        wav_file.setnchannels(1)
-        wav_file.setsampwidth(2)
+        wav_file.setnchannels(channels)
+        wav_file.setsampwidth(sample_width)
         wav_file.setframerate(sample_rate)
         wav_file.writeframes(pcm)
 
 
-def _read_wav(path: Path) -> tuple[int, int, bytes]:
+def _read_wav(path: Path) -> tuple[int, int, int, int, bytes]:
     with wave.open(str(path), "rb") as wav_file:
         sample_rate = wav_file.getframerate()
+        sample_width = wav_file.getsampwidth()
+        channels = wav_file.getnchannels()
         frames = wav_file.getnframes()
         pcm = wav_file.readframes(frames)
-    return sample_rate, frames, pcm
+    return sample_rate, sample_width, channels, frames, pcm
 
 
 def test_repair_misdeclared_clip_sample_rates_dry_run(hass: HomeAssistant, clean_db: None) -> None:
@@ -51,8 +60,10 @@ def test_repair_misdeclared_clip_sample_rates_dry_run(hass: HomeAssistant, clean
 
     assert summary.scanned == 1
     assert summary.repaired == 1
-    sample_rate, frames, repaired_pcm = _read_wav(wav_path)
+    sample_rate, sample_width, channels, frames, repaired_pcm = _read_wav(wav_path)
     assert sample_rate == 48000
+    assert sample_width == 2
+    assert channels == 1
     assert frames == 16000
     assert repaired_pcm == pcm
     assert db.fetch_clip(hass, 1).sample_rate == 48000
@@ -95,8 +106,10 @@ def test_repair_misdeclared_clip_sample_rates_updates_wav_db_and_sidecar(
 
     assert summary.scanned == 1
     assert summary.repaired == 1
-    sample_rate, frames, repaired_pcm = _read_wav(wav_path)
+    sample_rate, sample_width, channels, frames, repaired_pcm = _read_wav(wav_path)
     assert sample_rate == 16000
+    assert sample_width == 2
+    assert channels == 1
     assert frames == 16000
     assert repaired_pcm == pcm
 
@@ -173,3 +186,43 @@ def test_repair_misdeclared_clip_sample_rates_skips_nonmatching_wav_header(
     assert summary.scanned == 1
     assert summary.repaired == 0
     assert summary.skipped_header_rate == 1
+
+
+def test_repair_misdeclared_clip_sample_rates_rewrites_legacy_pcm_format(
+    hass: HomeAssistant, clean_db: None
+) -> None:
+    pcm = np.arange(16000, dtype="<i2").tobytes()
+    filename = "legacy-wide-header.wav"
+    db.insert_clip(
+        hass,
+        Clip(
+            filename=filename,
+            timestamp=datetime(2026, 3, 1, 12, 0, tzinfo=UTC),
+            sample_rate=48000,
+            sample_width=4,
+            channels=2,
+            duration=round(16000 / (48000 * 4), 4),
+        ),
+    )
+    wav_path = db.get_clips_dir(hass) / filename
+    _write_wav(wav_path, pcm, 48000, sample_width=4, channels=2)
+
+    summary = repair_misdeclared_clip_sample_rates(
+        db.get_storage_dir(hass),
+        dry_run=False,
+    )
+
+    assert summary.scanned == 1
+    assert summary.repaired == 1
+    sample_rate, sample_width, channels, frames, repaired_pcm = _read_wav(wav_path)
+    assert sample_rate == 16000
+    assert sample_width == 2
+    assert channels == 1
+    assert frames == 16000
+    assert repaired_pcm == pcm
+
+    clip = db.fetch_clip(hass, 1)
+    assert clip.sample_rate == 16000
+    assert clip.sample_width == 2
+    assert clip.channels == 1
+    assert clip.duration == 1.0

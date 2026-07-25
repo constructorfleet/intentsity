@@ -553,7 +553,7 @@ export function Annotator({ api, onError, onNotify }) {
                       {clip.assistant_id ?? "unknown"} · {formatDateTime(clip.timestamp)}
                     </div>
                   </div>
-                  <Tooltip content="Rewrite legacy 48 kHz metadata to 16 kHz without resampling">
+                  <Tooltip content="Rewrite legacy 48 kHz / 32-bit stereo metadata to 16 kHz / 16-bit mono without resampling">
                     <Button
                       size="sm"
                       variant="ghost"
