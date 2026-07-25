@@ -91,6 +91,9 @@ export function Trainer({ api, onError, onNotify }) {
   const [response, setResponse] = React.useState(null);
   const [selectedKey, setSelectedKey] = React.useState(null);
   const [draft, setDraft] = React.useState([]);
+  // Draft indices whose editor is open. A turn is read-only until the reviewer
+  // asks to correct it, so a fresh conversation reads as a transcript.
+  const [editing, setEditing] = React.useState(() => new Set());
   const [dirty, setDirty] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [exported, setExported] = React.useState(null);
@@ -147,14 +150,24 @@ export function Trainer({ api, onError, onNotify }) {
     if (!chat) {
       seededKey.current = null;
       setDraft([]);
+      setEditing(new Set());
       setDirty(false);
       return;
     }
     if (seededKey.current === activeKey) return;
     seededKey.current = activeKey;
     setDraft(draftFromChat(chat));
+    setEditing(new Set());
     setDirty(false);
   }, [chat, activeKey]);
+
+  const toggleEditing = React.useCallback((index) => {
+    setEditing((current) => {
+      const next = new Set(current);
+      if (!next.delete(index)) next.add(index);
+      return next;
+    });
+  }, []);
 
   const select = React.useCallback((key) => setSelectedKey(key), []);
 
@@ -208,6 +221,7 @@ export function Trainer({ api, onError, onNotify }) {
   const discard = React.useCallback(() => {
     if (!chat) return;
     setDraft(draftFromChat(chat));
+    setEditing(new Set());
     setDirty(false);
   }, [chat]);
 
@@ -290,6 +304,17 @@ export function Trainer({ api, onError, onNotify }) {
 
   const systemMessage = chat?.messages?.find((message) => message.sender === "system");
 
+  // Which draft turns no longer match the recorded transcript, by message ID
+  // where the correction carries one and by position otherwise.
+  const originalText = React.useMemo(() => {
+    const byId = new Map((chat?.messages ?? []).map((message) => [message.id, message.text ?? ""]));
+    const byPosition = (chat?.messages ?? []).map((message) => message.text ?? "");
+    return (message, index) =>
+      message.original_message_id != null && byId.has(message.original_message_id)
+        ? byId.get(message.original_message_id)
+        : (byPosition[index] ?? "");
+  }, [chat]);
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
       <Toolbar>
@@ -345,8 +370,15 @@ export function Trainer({ api, onError, onNotify }) {
             flexDirection: "column",
           }}
         >
-          <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)" }}>
+          <div
+            style={{
+              padding: "8px 8px 0",
+              minWidth: 0,
+              overflow: "hidden",
+            }}
+          >
             <Tabs
+              size="sm"
               value={tab}
               onChange={setTab}
               tabs={TABS.map((entry) => ({
@@ -462,65 +494,95 @@ export function Trainer({ api, onError, onNotify }) {
 
                 {visibleDraft.map(({ message, index }) => {
                   const role = turnRole(message.sender);
+                  const changed = (message.text ?? "") !== originalText(message, index);
                   if (isToolCall(message)) {
                     return (
-                      <div key={index}>
-                        <FieldLabel>Tool call — arguments editable</FieldLabel>
-                        <ToolInvocation
-                          name={
-                            message.data?.tool_calls?.[0]?.tool_name ??
-                            message.data?.tool_calls?.[0]?.name ??
-                            "tool_call"
-                          }
-                          status="ok"
-                          args={toolArgsText(message)}
-                        />
+                      <EditableTurn
+                        key={index}
+                        label="Tool call"
+                        editing={editing.has(index)}
+                        changed={changed}
+                        onToggle={() => toggleEditing(index)}
+                        // The arguments payload stays on screen while editing:
+                        // the text box holds notes about the call, not the args.
+                        keepPreview
+                        preview={
+                          <ToolInvocation
+                            name={
+                              message.data?.tool_calls?.[0]?.tool_name ??
+                              message.data?.tool_calls?.[0]?.name ??
+                              "tool_call"
+                            }
+                            status="ok"
+                            args={toolArgsText(message)}
+                          />
+                        }
+                      >
                         <Textarea
                           style={{ marginTop: 8, fontFamily: "var(--font-mono)", fontSize: 12 }}
                           minRows={4}
                           value={message.text}
-                          placeholder="Notes on this tool call (the arguments live in the payload below)"
+                          placeholder="Notes on this tool call (the arguments live in the payload above)"
                           onChange={(event) => updateDraft(index, { text: event.target.value })}
                         />
-                      </div>
+                      </EditableTurn>
                     );
                   }
                   if (isToolResult(message)) {
                     return (
-                      <div key={index}>
-                        <FieldLabel>Tool result — editable</FieldLabel>
-                        <ConversationTurn role="tool" timestamp={formatTime(message.timestamp)}>
-                          {message.text || "(empty)"}
-                        </ConversationTurn>
+                      <EditableTurn
+                        key={index}
+                        label="Tool result"
+                        editing={editing.has(index)}
+                        changed={changed}
+                        onToggle={() => toggleEditing(index)}
+                        preview={
+                          <ConversationTurn role="tool" timestamp={formatTime(message.timestamp)}>
+                            {message.text || "(empty)"}
+                          </ConversationTurn>
+                        }
+                      >
                         <Textarea
-                          style={{ marginTop: 8, fontFamily: "var(--font-mono)", fontSize: 12 }}
+                          style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}
                           minRows={3}
                           value={message.text}
                           onChange={(event) => updateDraft(index, { text: event.target.value })}
                         />
-                      </div>
+                      </EditableTurn>
                     );
                   }
                   if (role === "system") {
+                    // System prompts run to hundreds of lines; folded away they
+                    // stop burying the turns the reviewer is here to correct.
                     return (
-                      <ConversationTurn key={index} role="system" timestamp="prompt">
-                        {message.text || "(empty system prompt)"}
-                      </ConversationTurn>
+                      <Collapsible
+                        key={index}
+                        title="System prompt"
+                        meta={promptMeta(message.text)}
+                      >
+                        <PromptText text={message.text || "(empty system prompt)"} />
+                      </Collapsible>
                     );
                   }
                   return (
-                    <div key={index}>
-                      <FieldLabel>{role} — editable</FieldLabel>
-                      <ConversationTurn role={role} timestamp={formatTime(message.timestamp)}>
-                        {message.text || "(empty)"}
-                      </ConversationTurn>
+                    <EditableTurn
+                      key={index}
+                      label={role}
+                      editing={editing.has(index)}
+                      changed={changed}
+                      onToggle={() => toggleEditing(index)}
+                      preview={
+                        <ConversationTurn role={role} timestamp={formatTime(message.timestamp)}>
+                          {message.text || "(empty)"}
+                        </ConversationTurn>
+                      }
+                    >
                       <Textarea
-                        style={{ marginTop: 8 }}
                         minRows={2}
                         value={message.text}
                         onChange={(event) => updateDraft(index, { text: event.target.value })}
                       />
-                    </div>
+                    </EditableTurn>
                   );
                 })}
 
@@ -595,19 +657,9 @@ export function Trainer({ api, onError, onNotify }) {
               {systemMessage && (
                 <div>
                   <FieldLabel>System prompt (read-only)</FieldLabel>
-                  <pre
-                    style={{
-                      margin: 0,
-                      whiteSpace: "pre-wrap",
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11,
-                      color: "var(--text-muted)",
-                      maxHeight: 220,
-                      overflow: "auto",
-                    }}
-                  >
-                    {systemMessage.text}
-                  </pre>
+                  <Collapsible title="Show prompt" meta={promptMeta(systemMessage.text)}>
+                    <PromptText text={systemMessage.text} maxHeight={260} />
+                  </Collapsible>
                 </div>
               )}
             </div>
@@ -654,7 +706,118 @@ export function Trainer({ api, onError, onNotify }) {
   );
 }
 
-function FieldLabel({ children }) {
+/**
+ * One transcript turn. The editor stays hidden behind the pencil so an
+ * untouched conversation reads as a transcript rather than a wall of inputs.
+ */
+function EditableTurn({ label, editing, changed, onToggle, preview, keepPreview, children }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        <FieldLabel style={{ marginBottom: 0 }}>{label}</FieldLabel>
+        {/* With the editors hidden, this is the only cue that a turn was rewritten. */}
+        {changed && (
+          <Badge tone="fn" style={{ height: 16, fontSize: 9 }}>
+            edited
+          </Badge>
+        )}
+        <Tooltip content={editing ? "Done editing" : "Edit this turn"}>
+          <IconButton
+            size="sm"
+            active={editing}
+            aria-label={editing ? `Stop editing ${label}` : `Edit ${label}`}
+            aria-pressed={editing}
+            onClick={onToggle}
+          >
+            <Icon d={editing ? ICONS.check : ICONS.pencil} size={12} />
+          </IconButton>
+        </Tooltip>
+      </div>
+      {(!editing || keepPreview) && preview}
+      {editing && children}
+    </div>
+  );
+}
+
+const promptMeta = (text) => {
+  const value = text ?? "";
+  const lines = value ? value.split("\n").length : 0;
+  return `${lines} lines · ${value.length.toLocaleString()} chars`;
+};
+
+/** Disclosure wrapper, collapsed until the reviewer asks for the detail. */
+function Collapsible({ title, meta, defaultOpen = false, children }) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  return (
+    <div
+      style={{
+        border: "1px solid var(--border-subtle)",
+        borderRadius: "var(--r-md)",
+        background: "var(--surface-panel)",
+        minWidth: 0,
+      }}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          width: "100%",
+          padding: "8px 10px",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          textAlign: "left",
+          color: "var(--text-body)",
+          fontFamily: "var(--font-sans)",
+          fontSize: 12,
+          fontWeight: 500,
+        }}
+      >
+        <Icon d={open ? ICONS.chevronDown : ICONS.chevronRight} size={12} />
+        <span>{title}</span>
+        {meta && (
+          <span
+            style={{
+              marginLeft: "auto",
+              fontSize: 11,
+              fontFamily: "var(--font-mono)",
+              color: "var(--text-subtle)",
+            }}
+          >
+            {meta}
+          </span>
+        )}
+      </button>
+      {open && <div style={{ padding: "0 10px 10px" }}>{children}</div>}
+    </div>
+  );
+}
+
+function PromptText({ text, maxHeight = 360 }) {
+  return (
+    <pre
+      style={{
+        margin: 0,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        lineHeight: "var(--lh-normal)",
+        color: "var(--text-muted)",
+        maxHeight,
+        overflow: "auto",
+      }}
+    >
+      {text}
+    </pre>
+  );
+}
+
+function FieldLabel({ children, style }) {
   return (
     <div
       style={{
@@ -665,6 +828,7 @@ function FieldLabel({ children }) {
         fontWeight: 600,
         marginBottom: 6,
         fontFamily: "var(--font-mono)",
+        ...style,
       }}
     >
       {children}

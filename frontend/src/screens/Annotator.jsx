@@ -379,8 +379,15 @@ export function Annotator({ api, onError, onNotify }) {
             flexDirection: "column",
           }}
         >
-          <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)" }}>
+          <div
+            style={{
+              padding: "8px 8px 0",
+              minWidth: 0,
+              overflow: "hidden",
+            }}
+          >
             <Tabs
+              size="sm"
               value={tab}
               onChange={setTab}
               tabs={TABS.map((entry) => ({
