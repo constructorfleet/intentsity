@@ -123,7 +123,12 @@ def _process_intent_end(event: PipelineEvent, chat: Chat) -> Chat | None:
     if not event.data:
         return None
     data = event.data.copy()
-    response = data.get("response", {})
+    intent_output = data.get("intent_output")
+    response = (
+        intent_output.get("response", {})
+        if isinstance(intent_output, dict)
+        else data.get("response", {})
+    )
     speech = response.get("speech", {}).get("plain", {}).get("speech", None)
     if not speech:
         return None

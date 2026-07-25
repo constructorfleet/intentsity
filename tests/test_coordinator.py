@@ -215,6 +215,25 @@ def test_process_intent_end_records_the_speech() -> None:
     assert chat.messages[0].data == {}
 
 
+def test_process_intent_end_records_home_assistant_intent_output() -> None:
+    chat = _chat()
+    event = PipelineEvent(
+        PipelineEventType.INTENT_END,
+        {
+            "processed_locally": False,
+            "intent_output": {
+                "response": {"speech": {"plain": {"speech": "Done"}}},
+                "conversation_id": "conv-1",
+                "continue_conversation": False,
+            },
+        },
+    )
+
+    assert _process_intent_end(event, chat) is chat
+    assert chat.messages[0].sender == "assistant"
+    assert chat.messages[0].text == "Done"
+
+
 @pytest.mark.parametrize(
     "data",
     [
@@ -223,6 +242,8 @@ def test_process_intent_end_records_the_speech() -> None:
         {"response": {}},
         {"response": {"speech": {}}},
         {"response": {"speech": {"plain": {"speech": ""}}}},
+        {"intent_output": {"response": {}}},
+        {"intent_output": {"response": {"speech": {"plain": {"speech": ""}}}}},
     ],
 )
 def test_process_intent_end_without_speech(data) -> None:
@@ -244,7 +265,7 @@ def _full_run() -> PipelineRunDebug:
         ),
         PipelineEvent(
             PipelineEventType.INTENT_END,
-            {"response": {"speech": {"plain": {"speech": "Pong"}}}},
+            {"intent_output": {"response": {"speech": {"plain": {"speech": "Pong"}}}}},
         ),
     )
 

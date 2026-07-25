@@ -17,6 +17,7 @@ COORDINATOR_KEY: Final = "coordinator"
 AUDIO_KEY: Final = "audio"
 
 DATA_UNSUBSCRIBE: Final = "intentsity_unsubscribe"
+DATA_CHAT_LOG_UNSUBSCRIBE: Final = "intentsity_chat_log_unsubscribe"
 DATA_DB_INITIALIZED: Final = "db_initialized"
 DATA_API_REGISTERED: Final = "api_registered"
 DATA_WEBHOOK_ID: Final = "webhook_id"

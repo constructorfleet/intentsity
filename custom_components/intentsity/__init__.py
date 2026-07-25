@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 from random import randint
 
+from homeassistant.components.conversation.chat_log import async_subscribe_chat_logs
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -26,6 +27,7 @@ from .const import (
     AUDIO_KEY,
     COORDINATOR_KEY,
     DATA_API_REGISTERED,
+    DATA_CHAT_LOG_UNSUBSCRIBE,
     DATA_DB_INITIALIZED,
     DATA_UNSUBSCRIBE,
     DATA_WEBHOOK_ID,
@@ -74,6 +76,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         webhook.async_unregister(hass, webhook_id)
 
+    chat_log_unsubscribe = domain_data.pop(DATA_CHAT_LOG_UNSUBSCRIBE, None)
+    if chat_log_unsubscribe is not None:
+        chat_log_unsubscribe()
+
     unsubscribe = domain_data.pop(DATA_UNSUBSCRIBE, None)
     if unsubscribe is not None:
         unsubscribe()
@@ -100,10 +106,22 @@ async def _async_initialize(hass: HomeAssistant, entry: ConfigEntry) -> None:
         coordinator = IntentsityCoordinator(hass)
         domain_data[COORDINATOR_KEY] = coordinator
         await coordinator.async_config_entry_first_refresh()
+    else:
+        coordinator = domain_data[COORDINATOR_KEY]
 
     manager = CaptureManager(hass, dict(entry.options))
     domain_data[AUDIO_KEY] = manager
     await manager.async_start()
+
+    if DATA_CHAT_LOG_UNSUBSCRIBE not in domain_data:
+
+        @callback
+        def _handle_chat_log_event(*_: object) -> None:
+            hass.async_create_task(coordinator.async_request_refresh())
+
+        domain_data[DATA_CHAT_LOG_UNSUBSCRIBE] = async_subscribe_chat_logs(
+            hass, _handle_chat_log_event
+        )
 
     await _async_register_webhook(hass, entry)
 
