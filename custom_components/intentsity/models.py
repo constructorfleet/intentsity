@@ -333,6 +333,17 @@ class ClipTombstoneRequest(BaseModel):
         return value
 
 
+class ClipRateRepairRequest(BaseModel):
+    clip_id: int
+
+    @field_validator("clip_id")
+    @classmethod
+    def _validate_id(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("clip_id must be positive")
+        return value
+
+
 class CaptureNoiseRequest(BaseModel):
     """Capture the trailing buffer as a background-noise clip."""
 

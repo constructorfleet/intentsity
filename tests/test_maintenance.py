@@ -113,6 +113,47 @@ def test_repair_misdeclared_clip_sample_rates_updates_wav_db_and_sidecar(
     assert metadata["frames"] == 16000
 
 
+def test_repair_misdeclared_clip_sample_rates_can_target_one_clip(
+    hass: HomeAssistant, clean_db: None
+) -> None:
+    pcm = np.arange(16000, dtype="<i2").tobytes()
+    first_id = db.insert_clip(
+        hass,
+        Clip(
+            filename="first.wav",
+            timestamp=datetime(2026, 3, 1, 12, 0, tzinfo=UTC),
+            sample_rate=48000,
+            sample_width=2,
+            channels=1,
+        ),
+    )
+    second_id = db.insert_clip(
+        hass,
+        Clip(
+            filename="second.wav",
+            timestamp=datetime(2026, 3, 1, 12, 1, tzinfo=UTC),
+            sample_rate=48000,
+            sample_width=2,
+            channels=1,
+        ),
+    )
+    _write_wav(db.get_clips_dir(hass) / "first.wav", pcm, 48000)
+    _write_wav(db.get_clips_dir(hass) / "second.wav", pcm, 48000)
+
+    summary = repair_misdeclared_clip_sample_rates(
+        db.get_storage_dir(hass),
+        clip_id=second_id,
+        dry_run=False,
+    )
+
+    assert summary.scanned == 1
+    assert summary.repaired == 1
+    assert _read_wav(db.get_clips_dir(hass) / "first.wav")[0] == 48000
+    assert _read_wav(db.get_clips_dir(hass) / "second.wav")[0] == 16000
+    assert db.fetch_clip(hass, first_id).sample_rate == 48000
+    assert db.fetch_clip(hass, second_id).sample_rate == 16000
+
+
 def test_repair_misdeclared_clip_sample_rates_skips_nonmatching_wav_header(
     hass: HomeAssistant, clean_db: None
 ) -> None:

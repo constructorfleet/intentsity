@@ -30,6 +30,7 @@ from custom_components.intentsity.const import (
     WS_CMD_LABEL_CLIP,
     WS_CMD_LIST_CHATS,
     WS_CMD_LIST_CLIPS,
+    WS_CMD_REPAIR_CLIP_RATE,
     WS_CMD_SAVE_CORRECTED_CHAT,
     WS_CMD_SUBSCRIBE_CHATS,
     WS_CMD_SUBSCRIBE_CLIPS,
@@ -110,6 +111,7 @@ async def test_async_register_commands(hass: HomeAssistant) -> None:
         WS_CMD_SUBSCRIBE_CLIPS,
         WS_CMD_LABEL_CLIP,
         WS_CMD_TOMBSTONE_CLIPS,
+        WS_CMD_REPAIR_CLIP_RATE,
         WS_CMD_CAPTURE_NOISE,
         WS_CMD_ASSISTANTS,
     ):
@@ -481,6 +483,82 @@ async def test_tombstone_clips(hass: HomeAssistant, connection: _Connection, mon
 
     assert connection.results == [(10, {"updated": 1})]
     assert captured == {"clip_ids": [3], "restore": True}
+
+
+async def test_repair_clip_rate(hass: HomeAssistant, connection: _Connection, monkeypatch) -> None:
+    captured: dict[str, Any] = {}
+    signals: list[tuple] = []
+    from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+    async_dispatcher_connect(hass, SIGNAL_CLIP_RECORDED, lambda *args: signals.append(args))
+
+    def _repair(path, *, clip_id, dry_run):
+        captured.update(path=path, clip_id=clip_id, dry_run=dry_run)
+
+        class _Summary:
+            scanned = 1
+            repaired = 1
+            missing_file = 0
+            skipped_header_rate = 0
+            skipped_unsupported_format = 0
+
+        return _Summary()
+
+    monkeypatch.setattr(websocket, "repair_misdeclared_clip_sample_rates", _repair)
+
+    websocket.websocket_repair_clip_rate(
+        hass,
+        connection,
+        {"id": 11, "type": WS_CMD_REPAIR_CLIP_RATE, "clip_id": "7"},
+    )
+    await hass.async_block_till_done()
+
+    assert connection.results == [
+        (
+            11,
+            {
+                "scanned": 1,
+                "repaired": 1,
+                "missing_file": 0,
+                "skipped_header_rate": 0,
+                "skipped_unsupported_format": 0,
+            },
+        )
+    ]
+    assert captured["clip_id"] == 7
+    assert captured["dry_run"] is False
+    assert signals
+
+
+async def test_repair_clip_rate_does_not_signal_when_skipped(
+    hass: HomeAssistant, connection: _Connection, monkeypatch
+) -> None:
+    signals: list[tuple] = []
+    from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+    async_dispatcher_connect(hass, SIGNAL_CLIP_RECORDED, lambda *args: signals.append(args))
+
+    def _repair(*_args, **_kwargs):
+        class _Summary:
+            scanned = 0
+            repaired = 0
+            missing_file = 0
+            skipped_header_rate = 0
+            skipped_unsupported_format = 0
+
+        return _Summary()
+
+    monkeypatch.setattr(websocket, "repair_misdeclared_clip_sample_rates", _repair)
+
+    websocket.websocket_repair_clip_rate(
+        hass,
+        connection,
+        {"id": 12, "type": WS_CMD_REPAIR_CLIP_RATE, "clip_id": 7},
+    )
+    await hass.async_block_till_done()
+
+    assert connection.results[0][1]["repaired"] == 0
+    assert signals == []
 
 
 # --- Noise capture --------------------------------------------------------

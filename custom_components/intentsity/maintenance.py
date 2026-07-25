@@ -32,6 +32,7 @@ def _storage_dir(config_or_storage_dir: Path) -> Path:
 def repair_misdeclared_clip_sample_rates(
     config_or_storage_dir: Path,
     *,
+    clip_id: int | None = None,
     from_rate: int = 48000,
     to_rate: int = 16000,
     dry_run: bool = True,
@@ -53,15 +54,27 @@ def repair_misdeclared_clip_sample_rates(
     connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
     try:
-        rows = connection.execute(
-            """
-            SELECT id, filename
-            FROM clips
-            WHERE sample_rate = ?
-            ORDER BY id
-            """,
-            (from_rate,),
-        ).fetchall()
+        if clip_id is None:
+            rows = connection.execute(
+                """
+                SELECT id, filename
+                FROM clips
+                WHERE sample_rate = ?
+                ORDER BY id
+                """,
+                (from_rate,),
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                """
+                SELECT id, filename
+                FROM clips
+                WHERE id = ?
+                  AND sample_rate = ?
+                ORDER BY id
+                """,
+                (clip_id, from_rate),
+            ).fetchall()
 
         for row in rows:
             summary.scanned += 1

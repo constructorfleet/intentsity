@@ -179,6 +179,12 @@ def test_clip_tombstone_request_requires_ids() -> None:
     assert models.ClipTombstoneRequest(clip_ids=[3]).restore is False
 
 
+def test_clip_rate_repair_request_requires_a_positive_id() -> None:
+    with pytest.raises(ValueError, match="clip_id must be positive"):
+        models.ClipRateRepairRequest(clip_id=0)
+    assert models.ClipRateRepairRequest(clip_id=3).clip_id == 3
+
+
 def test_capture_noise_request_bounds() -> None:
     assert models.CaptureNoiseRequest(seconds=5).assistant_id == "default"
     with pytest.raises(ValueError):
