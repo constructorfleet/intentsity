@@ -9,6 +9,10 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App.jsx";
 import { FONT_HREF, tokensCss } from "./ds/tokens.js";
+import appCss from "./styles/app.css";
+
+// Token declarations first: the panel styles below build on them.
+const panelCss = `${tokensCss}\n${appCss}`;
 
 const TAG = "intentsity-panel";
 const FONT_LINK_ID = "intentsity-fonts";
@@ -34,7 +38,7 @@ function tokenSheet() {
   if (sharedSheet) return sharedSheet;
   if (typeof CSSStyleSheet !== "undefined" && "replaceSync" in CSSStyleSheet.prototype) {
     sharedSheet = new CSSStyleSheet();
-    sharedSheet.replaceSync(tokensCss);
+    sharedSheet.replaceSync(panelCss);
   }
   return sharedSheet;
 }
@@ -61,7 +65,7 @@ class IntentsityPanel extends HTMLElement {
     } else {
       // Safari < 16.4 and other engines without adoptedStyleSheets support.
       const style = document.createElement("style");
-      style.textContent = tokensCss;
+      style.textContent = panelCss;
       shadow.appendChild(style);
     }
 

@@ -121,6 +121,25 @@ Everything is set from **Settings → Devices & Services → Intentsity → Conf
 | MQTT audio / event / format topics | `assist/debug/+/{pcm,events,audio_info}` | The `+` marks the assistant ID segment |
 | Delete clips after | `0` days | `0` keeps clips forever; pruning runs twice a day |
 
+## Reviewing in the panel
+
+Both surfaces share one layout: a queue on the left, the item under review in the middle,
+and — on Intent training — run details on the right. Every divider is draggable, and the
+widths are remembered per browser. The panel measures itself rather than the window, so it
+reflows as Home Assistant's own sidebar opens and closes: the side columns fold into
+overlays you open from the toolbar when there is no room to dock them.
+
+Conversations are grouped by conversation ID. An Assist dialogue that spans several pipeline
+runs appears as one group of `run 1/N` rows rather than as unrelated chats. IDs are shown
+shortened, but the full value is behind every one of them — hover to read it, click to copy.
+
+| Key | Wake word | Intent training |
+| --- | --- | --- |
+| `J` / `K`, `↑` / `↓` | Previous / next clip | Previous / next run |
+| `Space` | Play or pause | — |
+| `1`–`5` | Apply a label | — |
+| `⌘S` / `Ctrl+S` | — | Save the correction |
+
 ## Storage
 
 Everything Intentsity owns lives under `config/intentsity/`, so a single directory covers
