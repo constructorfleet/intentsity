@@ -179,6 +179,53 @@ def test_process_intent_progress_prefers_tool_calls_over_content() -> None:
     assert chat.messages[0].sender == "tool_calls"
 
 
+def _progress(chat: Chat, delta: dict) -> None:
+    _process_intent_progress(
+        PipelineEvent(PipelineEventType.INTENT_PROGRESS, {"chat_log_delta": delta}), chat
+    )
+
+
+def test_process_intent_progress_joins_role_less_content_chunks() -> None:
+    """Streaming deltas continue the open assistant turn instead of opening new ones."""
+    chat = _chat()
+    _progress(chat, {"role": "assistant", "content": "Turning "})
+    _progress(chat, {"content": "on "})
+    _progress(chat, {"content": "the light"})
+
+    assert len(chat.messages) == 1
+    assert chat.messages[0].sender == "assistant"
+    assert chat.messages[0].text == "Turning on the light"
+
+
+def test_process_intent_progress_opens_a_turn_for_the_first_chunk() -> None:
+    """HA sends the role in a content-less delta, so the first chunk has none."""
+    chat = _chat()
+    _process_intent_start(
+        PipelineEvent(PipelineEventType.INTENT_START, {"intent_input": "Hi"}), chat
+    )
+    _progress(chat, {"role": "assistant"})
+    _progress(chat, {"content": "Hel"})
+    _progress(chat, {"content": "lo"})
+
+    assert [message.sender for message in chat.messages] == ["user", "assistant"]
+    assert chat.messages[1].text == "Hello"
+
+
+def test_process_intent_progress_does_not_join_across_a_tool_turn() -> None:
+    """A tool result closes the assistant turn; the reply after it is its own."""
+    chat = _chat()
+    _progress(chat, {"role": "assistant", "content": "Checking"})
+    _progress(chat, {"role": "tool_result", "tool_result": {"result": "ok"}})
+    _progress(chat, {"content": "Done"})
+
+    assert [message.sender for message in chat.messages] == [
+        "assistant",
+        "tool_result",
+        "assistant",
+    ]
+    assert chat.messages[2].text == "Done"
+
+
 @pytest.mark.parametrize("data", [None, {}, {"chat_log_delta": None}, {"chat_log_delta": {}}])
 def test_process_intent_progress_without_a_delta(data) -> None:
     chat = _chat()
@@ -234,6 +281,31 @@ def test_process_intent_end_records_home_assistant_intent_output() -> None:
     assert chat.messages[0].text == "Done"
 
 
+def test_process_intent_end_skips_speech_already_streamed() -> None:
+    """The closing speech repeats the streamed reply; recording it doubles the turn."""
+    chat = _chat()
+    _progress(chat, {"role": "assistant", "content": "Turning on the light"})
+    event = PipelineEvent(
+        PipelineEventType.INTENT_END,
+        {"response": {"speech": {"plain": {"speech": "Turning on the light\n"}}}},
+    )
+
+    assert _process_intent_end(event, chat) is chat
+    assert len(chat.messages) == 1
+
+
+def test_process_intent_end_records_speech_that_differs_from_the_stream() -> None:
+    chat = _chat()
+    _progress(chat, {"role": "assistant", "content": "Thinking…"})
+    event = PipelineEvent(
+        PipelineEventType.INTENT_END,
+        {"response": {"speech": {"plain": {"speech": "Turning on the light"}}}},
+    )
+
+    assert _process_intent_end(event, chat) is chat
+    assert [message.text for message in chat.messages] == ["Thinking…", "Turning on the light"]
+
+
 @pytest.mark.parametrize(
     "data",
     [
@@ -282,19 +354,14 @@ def test_process_pipeline_run_prepends_system_content(hass: HomeAssistant) -> No
     # Multiple system blocks are joined, and their dicts merged into data.
     assert chat.messages[0].text == "A\n\nB"
     assert chat.messages[0].data["role"] == "system"
-    assert [message.sender for message in chat.messages] == [
-        "system",
-        "user",
-        "assistant",
-        "assistant",
-    ]
+    assert [message.sender for message in chat.messages] == ["system", "user", "assistant"]
 
 
 def test_process_pipeline_run_without_chat_logs(hass: HomeAssistant) -> None:
     coordinator = IntentsityCoordinator(hass)
     chat = coordinator._process_pipeline_run(_full_run(), "run-1")
     assert chat is not None
-    assert [message.sender for message in chat.messages] == ["user", "assistant", "assistant"]
+    assert [message.sender for message in chat.messages] == ["user", "assistant"]
 
 
 def test_process_pipeline_run_without_a_matching_log(hass: HomeAssistant) -> None:
@@ -343,7 +410,35 @@ def test_process_pipeline_run_ignores_unhandled_events(hass: HomeAssistant) -> N
 
     chat = coordinator._process_pipeline_run(run, "run-1")
     assert chat is not None
-    assert [message.sender for message in chat.messages] == ["user", "assistant", "assistant"]
+    assert [message.sender for message in chat.messages] == ["user", "assistant"]
+
+
+def test_process_pipeline_run_joins_a_streamed_reply(hass: HomeAssistant) -> None:
+    """A streamed reply is one turn, not one turn per chunk plus the final speech."""
+    hass.data[DATA_CHAT_LOGS] = {"conv-4": _ChatLogStub([])}
+    coordinator = IntentsityCoordinator(hass)
+    run = _run_debug(
+        PipelineEvent(PipelineEventType.RUN_START, {"conversation_id": "conv-4"}),
+        PipelineEvent(PipelineEventType.INTENT_START, {"intent_input": "Ping"}),
+        PipelineEvent(PipelineEventType.INTENT_PROGRESS, {"chat_log_delta": {"role": "assistant"}}),
+        *(
+            PipelineEvent(PipelineEventType.INTENT_PROGRESS, {"chat_log_delta": {"content": chunk}})
+            for chunk in ("Turning ", "on ", "the light")
+        ),
+        PipelineEvent(
+            PipelineEventType.INTENT_END,
+            {
+                "intent_output": {
+                    "response": {"speech": {"plain": {"speech": "Turning on the light"}}}
+                }
+            },
+        ),
+    )
+
+    chat = coordinator._process_pipeline_run(run, "run-1")
+    assert chat is not None
+    assert [message.sender for message in chat.messages] == ["user", "assistant"]
+    assert chat.messages[1].text == "Turning on the light"
 
 
 # --- Update cycle ---------------------------------------------------------
