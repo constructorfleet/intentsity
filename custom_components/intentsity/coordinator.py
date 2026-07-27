@@ -106,6 +106,14 @@ def _process_intent_progress(event: PipelineEvent, chat: Chat) -> Chat | None:
             )
         )
     elif "content" in data:
+        # A streaming agent emits one delta per chunk of the *same* reply. Only
+        # the chunk that opens a content item carries a role, so a role-less
+        # delta continues the turn already in progress instead of starting a new
+        # one — otherwise a 40-chunk answer reads as 40 assistant turns.
+        previous = chat.messages[-1] if chat.messages else None
+        if "role" not in data and previous is not None and previous.sender == "assistant":
+            previous.text += str(data.get("content", ""))
+            return chat
         chat.messages.append(
             ChatMessage(
                 chat_id=chat.conversation_id,
@@ -132,6 +140,16 @@ def _process_intent_end(event: PipelineEvent, chat: Chat) -> Chat | None:
     speech = response.get("speech", {}).get("plain", {}).get("speech", None)
     if not speech:
         return None
+
+    # The pipeline's closing speech is the same text a streaming agent already
+    # recorded chunk by chunk. Appending it again would double the last turn.
+    previous = chat.messages[-1] if chat.messages else None
+    if (
+        previous is not None
+        and previous.sender == "assistant"
+        and previous.text.strip() == speech.strip()
+    ):
+        return chat
 
     chat.messages.append(
         ChatMessage(

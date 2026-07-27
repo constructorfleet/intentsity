@@ -1,0 +1,140 @@
+/* Panel-level styling that inline styles cannot express: keyframes, hover and
+   focus states, and the reduced-motion opt-out. Loaded into the shadow root
+   alongside the design-system tokens (see panel.jsx). */
+
+@keyframes intentsity-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes intentsity-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Overlay panes slide in from the edge they are anchored to. */
+@keyframes intentsity-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes intentsity-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Entrance animations. `both` holds the start frame so a staggered item is not
+   briefly visible before its delay elapses. */
+.ist-rise {
+  animation: intentsity-rise var(--dur-med) var(--ease-out) both;
+}
+
+.ist-fade {
+  animation: intentsity-fade var(--dur-med) var(--ease-out) both;
+}
+
+.ist-slide-left {
+  animation: intentsity-slide-left var(--dur-med) var(--ease-out) both;
+}
+
+.ist-slide-right {
+  animation: intentsity-slide-right var(--dur-med) var(--ease-out) both;
+}
+
+/* Selectable rows in the queue lists. The hover fill needs `!important`: the
+   row's own background is an inline style, which otherwise always wins. */
+.ist-row {
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
+.ist-row[data-active="false"]:hover {
+  background: var(--surface-hover) !important;
+}
+
+.ist-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Panes animate their width when a breakpoint moves them, but not while the
+   reviewer is dragging the divider — a transition there lags the pointer. */
+.ist-pane {
+  transition: width var(--dur-med) var(--ease-out);
+}
+
+.ist-pane[data-dragging="true"] {
+  transition: none;
+}
+
+/* Drag handle between two panes. The hit area is wider than the visible line so
+   it stays grabbable without drawing a heavy divider. */
+.ist-resizer {
+  flex: 0 0 7px;
+  width: 7px;
+  align-self: stretch;
+  position: relative;
+  cursor: col-resize;
+  background: transparent;
+  border: none;
+  padding: 0;
+  touch-action: none;
+}
+
+.ist-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.ist-resizer:hover::after,
+.ist-resizer:focus-visible::after,
+.ist-resizer[data-dragging="true"]::after {
+  background: var(--accent);
+}
+
+.ist-resizer:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ist-rise,
+  .ist-fade,
+  .ist-slide-left,
+  .ist-slide-right {
+    animation: none;
+  }
+
+  .ist-pane,
+  .ist-row,
+  .ist-resizer::after {
+    transition: none;
+  }
+}

@@ -39,4 +39,8 @@ export const ICONS = {
   pencil: "M11.5 2.5l2 2L6 12l-3 1 1-3 7.5-7.5z",
   save: "M3 3h8l2 2v8H3V3z|M5.5 3v3h5V3|M5.5 13v-4h5v4",
   plus: "M3 8h10M8 3v10",
+  copy: "M6 6h7v7H6z|M3 10V3h7",
+  // A reply arrow: marks a run that continues an earlier conversation.
+  thread: "M4 3v6a2 2 0 002 2h6|M9 8l3 3-3 3",
+  info: "M8 2a6 6 0 100 12A6 6 0 008 2z|M8 7.5v3.5|M8 5h.01",
 };

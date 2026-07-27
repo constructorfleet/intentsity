@@ -1,6 +1,7 @@
 import React from "react";
 
 import { Icon, ICONS } from "../components/Icon.jsx";
+import { Resizer } from "../components/Resizer.jsx";
 import {
   Badge,
   Button,
@@ -28,10 +29,21 @@ import {
   formatSeconds,
   formatTime,
 } from "../lib/format.js";
-import { useKeyboard, useSubscription } from "../lib/hooks.js";
+import {
+  useElementWidth,
+  useKeyboard,
+  useResizableColumn,
+  useSubscription,
+} from "../lib/hooks.js";
 
 const PAGE_SIZE = 50;
 const NOISE_SECONDS = 5;
+
+// Below this container width the clip list folds into an overlay: the waveform
+// and the label chips need the room more than the queue does.
+const LIST_BREAKPOINT = 720;
+// Below this the metadata and status cards stop sitting side by side.
+const CARDS_BREAKPOINT = 860;
 
 // Each queue maps to a server-side filter, so paging never has to be corrected
 // on the client.
@@ -90,7 +102,7 @@ function matchesQuery(clip, query) {
   return haystack.includes(query.toLowerCase());
 }
 
-export function Annotator({ api, onError, onNotify }) {
+export function Annotator({ api, nav, trailing, onError, onNotify }) {
   const [tab, setTab] = React.useState("unlabeled");
   const [assistantFilter, setAssistantFilter] = React.useState("");
   const [query, setQuery] = React.useState("");
@@ -106,6 +118,22 @@ export function Annotator({ api, onError, onNotify }) {
   const [playing, setPlaying] = React.useState(false);
   const [playhead, setPlayhead] = React.useState(0);
   const audioRef = React.useRef(null);
+
+  const rootRef = React.useRef(null);
+  const containerWidth = useElementWidth(rootRef);
+  const listCramped = containerWidth > 0 && containerWidth < LIST_BREAKPOINT;
+  const stackCards = containerWidth > 0 && containerWidth < CARDS_BREAKPOINT;
+
+  const [listOpen, setListOpen] = React.useState(true);
+  // Crossing the breakpoint sets the default; the toggle then holds until the
+  // layout changes shape again.
+  React.useEffect(() => setListOpen(!listCramped), [listCramped]);
+
+  const listPane = useResizableColumn("intentsity.annotator.listWidth", {
+    initial: 320,
+    min: 240,
+    max: 520,
+  });
 
   const activeTab = TABS.find((entry) => entry.value === tab) ?? TABS[0];
 
@@ -154,11 +182,17 @@ export function Annotator({ api, onError, onNotify }) {
     }
   }, [clips, selectedId, selectedIndex]);
 
-  const select = React.useCallback((clipId) => {
-    setSelectedId(clipId);
-    setPlayhead(0);
-    setPlaying(false);
-  }, []);
+  const select = React.useCallback(
+    (clipId) => {
+      setSelectedId(clipId);
+      setPlayhead(0);
+      setPlaying(false);
+      // On a narrow layout the list sits over the clip; picking a row is the
+      // reviewer saying they are done with it.
+      if (listCramped) setListOpen(false);
+    },
+    [listCramped],
+  );
 
   const step = React.useCallback(
     (delta) => {
@@ -342,11 +376,24 @@ export function Annotator({ api, onError, onNotify }) {
   ].filter(Boolean);
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-      <Toolbar>
-        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Wake word</span>
-        <span style={{ fontSize: 12, color: "var(--text-subtle)" }}>/</span>
-        <span style={{ fontWeight: 600, fontSize: 14 }}>Clip review</span>
+    <div ref={rootRef} style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <Toolbar style={{ flexWrap: "wrap", rowGap: 8 }}>
+        {nav}
+        <ToolbarSeparator />
+        <Tooltip content={listOpen ? "Hide clip list" : "Show clip list"}>
+          <IconButton
+            size="sm"
+            active={listOpen}
+            aria-label={listOpen ? "Hide clip list" : "Show clip list"}
+            aria-pressed={listOpen}
+            onClick={() => setListOpen((open) => !open)}
+          >
+            <Icon d={ICONS.list} size={12} />
+          </IconButton>
+        </Tooltip>
+        {containerWidth >= LIST_BREAKPOINT && (
+          <span style={{ fontWeight: 600, fontSize: 14 }}>Clip review</span>
+        )}
         <Badge tone="brand">{unlabeledTotal} unlabeled</Badge>
         <ToolbarSeparator />
         <Input
@@ -354,7 +401,7 @@ export function Annotator({ api, onError, onNotify }) {
           placeholder="Filter by device, label, time…"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          style={{ width: 260 }}
+          style={{ width: "clamp(150px, 24vw, 260px)" }}
           prefix={<Icon d={ICONS.search} size={12} />}
         />
         <Select
@@ -362,7 +409,7 @@ export function Annotator({ api, onError, onNotify }) {
           options={assistantOptions}
           value={assistantFilter}
           onChange={(event) => setAssistantFilter(event.target.value)}
-          style={{ width: 170 }}
+          style={{ width: 160 }}
         />
         <ToolbarSpacer />
         <Switch checked={autoAdvance} onChange={setAutoAdvance} label="Auto-advance" />
@@ -386,121 +433,44 @@ export function Annotator({ api, onError, onNotify }) {
         >
           Export clips
         </Button>
+        <ToolbarSeparator />
+        {trailing}
       </Toolbar>
 
-      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        <div
-          style={{
-            width: 320,
-            minWidth: 320,
-            borderRight: "1px solid var(--border-subtle)",
-            background: "var(--surface-panel)",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
+      <div style={{ flex: 1, display: "flex", minHeight: 0, position: "relative" }}>
+        {listOpen && (
+          <ClipList
+            clips={clips}
+            response={response}
+            activeId={clip?.id ?? null}
+            tab={tab}
+            onTab={setTab}
+            onSelect={select}
+            floating={listCramped}
+            width={listPane.width}
+            dragging={listPane.dragging}
+          />
+        )}
+        {listOpen && !listCramped && (
+          <Resizer label="Resize the clip list" {...listPane.handleProps} />
+        )}
+        {listOpen && listCramped && (
           <div
+            className="ist-fade"
+            onClick={() => setListOpen(false)}
             style={{
-              padding: "8px 8px 0",
-              minWidth: 0,
-              overflow: "hidden",
+              position: "absolute",
+              inset: 0,
+              zIndex: 10,
+              background: "var(--surface-overlay)",
             }}
-          >
-            <Tabs
-              size="sm"
-              value={tab}
-              onChange={setTab}
-              tabs={TABS.map((entry) => ({
-                value: entry.value,
-                label: entry.label,
-                count: response?.[entry.countKey],
-              }))}
-            />
-          </div>
-          <div style={{ flex: 1, overflow: "auto" }}>
-            {clips.length === 0 && (
-              <div style={{ padding: 20, fontSize: 13, color: "var(--text-muted)" }}>
-                {response ? "No clips match these filters." : "Loading clips…"}
-              </div>
-            )}
-            {clips.map((entry) => {
-              const active = entry.id === clip?.id;
-              const tone = entry.label && entry.label !== "unlabeled" ? labelTone(entry.label) : null;
-              const toneColor = tone
-                ? `var(--${tone === "bgnoise" ? "bg" : tone}-500)`
-                : "transparent";
-              return (
-                <button
-                  key={entry.id}
-                  type="button"
-                  onClick={() => select(entry.id)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    width: "100%",
-                    padding: "10px 12px",
-                    border: "none",
-                    textAlign: "left",
-                    background: active ? "var(--accent-quiet)" : "transparent",
-                    borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent",
-                    borderBottom: "1px solid var(--border-subtle)",
-                    cursor: "pointer",
-                    color: "var(--text-body)",
-                    opacity: entry.deleted_at ? 0.55 : 1,
-                  }}
-                >
-                  <div
-                    style={{ width: 3, alignSelf: "stretch", background: toneColor, borderRadius: 2 }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}
-                    >
-                      <span
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 12,
-                          fontWeight: 500,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {entry.filename}
-                      </span>
-                      {tone && (
-                        <Badge tone={tone} style={{ height: 16, padding: "0 6px", fontSize: 9 }}>
-                          {LABEL_BY_ID.get(entry.label)?.short}
-                        </Badge>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        fontSize: 11,
-                        color: "var(--text-muted)",
-                        fontFamily: "var(--font-mono)",
-                      }}
-                    >
-                      <span>{formatSeconds(entry.duration)}</span>
-                      <span>·</span>
-                      <span>{entry.assistant_id ?? "unknown"}</span>
-                      <span>·</span>
-                      <span>{formatTime(entry.timestamp)}</span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          />
+        )}
 
         <div
           style={{
             flex: 1,
-            padding: 20,
+            padding: "clamp(12px, 2vw, 20px)",
             overflow: "auto",
             display: "flex",
             flexDirection: "column",
@@ -523,8 +493,13 @@ export function Annotator({ api, onError, onNotify }) {
           )}
 
           {clip && (
-            <>
-              <Card padded={false}>
+            // Keyed on the clip so switching selection replays the entrance.
+            <React.Fragment key={clip.id}>
+              {/* Card takes no className, so the entrance rides on its style. */}
+              <Card
+                padded={false}
+                style={{ animation: "intentsity-rise var(--dur-med) var(--ease-out) both" }}
+              >
                 <div
                   style={{
                     padding: "14px 18px",
@@ -532,6 +507,7 @@ export function Annotator({ api, onError, onNotify }) {
                     display: "flex",
                     alignItems: "center",
                     gap: 12,
+                    flexWrap: "wrap",
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -685,7 +661,15 @@ export function Annotator({ api, onError, onNotify }) {
                 </div>
               </Card>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div
+                className="ist-rise"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: stackCards ? "1fr" : "1fr 1fr",
+                  gap: 16,
+                  animationDelay: "60ms",
+                }}
+              >
                 <Card title="Clip metadata" elevation="flat">
                   <KeyValue
                     items={[
@@ -736,10 +720,146 @@ export function Annotator({ api, onError, onNotify }) {
                   </div>
                 </Card>
               </div>
-            </>
+            </React.Fragment>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The review queue. Docked beside the clip on a wide layout; on a narrow one it
+ * floats over it, so the waveform and the label chips keep the width they need.
+ */
+function ClipList({
+  clips,
+  response,
+  activeId,
+  tab,
+  onTab,
+  onSelect,
+  floating,
+  width,
+  dragging,
+}) {
+  return (
+    <div
+      className={floating ? "ist-slide-right" : "ist-pane"}
+      data-dragging={dragging ? "true" : "false"}
+      style={{
+        width,
+        minWidth: width,
+        borderRight: "1px solid var(--border-subtle)",
+        background: "var(--surface-panel)",
+        display: "flex",
+        flexDirection: "column",
+        ...(floating
+          ? {
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              zIndex: 20,
+              boxShadow: "var(--shadow-lg)",
+            }
+          : null),
+      }}
+    >
+      <div style={{ padding: "8px 8px 0", minWidth: 0, overflow: "hidden" }}>
+        <Tabs
+          size="sm"
+          value={tab}
+          onChange={onTab}
+          tabs={TABS.map((entry) => ({
+            value: entry.value,
+            label: entry.label,
+            count: response?.[entry.countKey],
+          }))}
+        />
+      </div>
+      <div style={{ flex: 1, overflow: "auto" }}>
+        {clips.length === 0 && (
+          <div style={{ padding: 20, fontSize: 13, color: "var(--text-muted)" }}>
+            {response ? "No clips match these filters." : "Loading clips…"}
+          </div>
+        )}
+        {clips.map((entry) => (
+          <ClipRow
+            key={entry.id}
+            clip={entry}
+            active={entry.id === activeId}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ClipRow({ clip, active, onSelect }) {
+  const tone = clip.label && clip.label !== "unlabeled" ? labelTone(clip.label) : null;
+  const toneColor = tone ? `var(--${tone === "bgnoise" ? "bg" : tone}-500)` : "transparent";
+  return (
+    <button
+      type="button"
+      className="ist-row ist-fade"
+      data-active={active ? "true" : "false"}
+      title={clip.filename}
+      onClick={() => onSelect(clip.id)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        width: "100%",
+        padding: "10px 12px",
+        border: "none",
+        textAlign: "left",
+        background: active ? "var(--accent-quiet)" : "transparent",
+        borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent",
+        borderBottom: "1px solid var(--border-subtle)",
+        cursor: "pointer",
+        color: "var(--text-body)",
+        opacity: clip.deleted_at ? 0.55 : 1,
+      }}
+    >
+      <div style={{ width: 3, alignSelf: "stretch", background: toneColor, borderRadius: 2 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 12,
+              fontWeight: 500,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {clip.filename}
+          </span>
+          {tone && (
+            <Badge tone={tone} style={{ height: 16, padding: "0 6px", fontSize: 9 }}>
+              {LABEL_BY_ID.get(clip.label)?.short}
+            </Badge>
+          )}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            fontSize: 11,
+            color: "var(--text-muted)",
+            fontFamily: "var(--font-mono)",
+          }}
+        >
+          <span>{formatSeconds(clip.duration)}</span>
+          <span>·</span>
+          <span>{clip.assistant_id ?? "unknown"}</span>
+          <span>·</span>
+          <span>{formatTime(clip.timestamp)}</span>
+        </div>
+      </div>
+    </button>
   );
 }
